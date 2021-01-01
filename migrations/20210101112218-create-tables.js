@@ -74,7 +74,7 @@ module.exports = {
           key: 'id',
         },
       },
-      UserId: {
+      PlayerId: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
@@ -82,14 +82,14 @@ module.exports = {
           key: 'id',
         },
       },
-      createdAt: {
-        allowNull: false,
-        type: Sequelize.DATE,
-      },
-      updatedAt: {
-        allowNull: false,
-        type: Sequelize.DATE,
-      },
+      // createdAt: {
+      //   allowNull: false,
+      //   type: Sequelize.DATE,
+      // },
+      // updatedAt: {
+      //   allowNull: false,
+      //   type: Sequelize.DATE,
+      // },
     });
   },
 
