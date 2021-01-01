@@ -59,6 +59,20 @@ module.exports = {
       },
     });
 
+    await queryInterface.createTable('GameTokens', {
+      id: {
+        allowNull: false,
+        autoIncrement: true,
+        primaryKey: true,
+        type: Sequelize.INTEGER,
+      },
+      // To store an image that can be used as a game piece
+      imageFilePath: {
+        type: Sequelize.STRING,
+        allowNull: false,
+      },
+    });
+
     await queryInterface.createTable('GamesUsers', {
       id: {
         allowNull: false,
@@ -82,6 +96,14 @@ module.exports = {
           key: 'id',
         },
       },
+      TokenId: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'GameTokens',
+          key: 'id',
+        },
+      },
       // createdAt: {
       //   allowNull: false,
       //   type: Sequelize.DATE,
@@ -95,6 +117,7 @@ module.exports = {
 
   down: async (queryInterface, Sequelize) => {
     await queryInterface.dropTable('GamesUsers');
+    await queryInterface.dropTable('GameTokens');
     await queryInterface.dropTable('Games');
     await queryInterface.dropTable('Users');
   },

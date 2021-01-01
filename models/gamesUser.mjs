@@ -26,6 +26,14 @@ export default function gamesUserModel(sequelize, DataTypes) {
           key: 'id',
         },
       },
+      TokenId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'GameTokens',
+          key: 'id',
+        },
+      },
     },
     {
       // timestamps: false prevents Sequelize from adding

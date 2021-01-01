@@ -5,6 +5,7 @@ import allConfig from '../config/config.js';
 import gameModel from './game.mjs';
 import userModel from './user.mjs';
 import gamesUserModel from './gamesUser.mjs';
+import gameTokenModel from './gameToken.mjs';
 
 const env = process.env.NODE_ENV || 'development';
 
@@ -38,6 +39,7 @@ if (env === 'production') {
 db.Game = gameModel(sequelize, Sequelize.DataTypes);
 db.User = userModel(sequelize, Sequelize.DataTypes);
 db.GamesUser = gamesUserModel(sequelize, Sequelize.DataTypes);
+db.GameToken = gameTokenModel(sequelize, Sequelize.DataTypes);
 
 // Associations
 // A user can have many games and a Game can have many users
@@ -45,6 +47,24 @@ db.GamesUser = gamesUserModel(sequelize, Sequelize.DataTypes);
 // Here it is through the join table "GamesUsers"
 db.User.belongsToMany(db.Game, { through: db.GamesUser });
 db.Game.belongsToMany(db.User, { through: db.GamesUser });
+// Also specify the super-many-to-many relationship
+db.GamesUser.belongsTo(db.User);
+db.User.hasMany(db.GamesUser);
+db.GamesUser.belongsTo(db.Game);
+db.Game.hasMany(db.GamesUser);
+
+// Association of GameTokens
+// A token can have many games.
+db.GameToken.belongsToMany(db.Game, { through: db.GamesUser });
+// A game can have many tokens.
+db.Game.belongsToMany(db.GameToken, { through: db.GamesUser });
+// A player can have many tokens
+db.User.belongsToMany(db.GameToken, { through: db.GamesUser });
+// A token can have many players
+db.GameToken.belongsToMany(db.User, { through: db.GamesUser });
+// Also specify the super-many-to-many relationship
+db.GamesUser.belongsTo(db.GameToken);
+db.GameToken.hasMany(db.GamesUser);
 
 // Also Users table is directly associated with Games table as 1 to Many association
 // A game can have a winner
