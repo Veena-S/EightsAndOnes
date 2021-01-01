@@ -18,7 +18,7 @@ export default function routes(app) {
   const GamesController = games(db);
 
   /**
-   * Request handler for creating a new board
+   * Request handler for creating a new game
    */
-  app.post('/createGame', GamesController.handleCreateBoardRequest);
+  app.post('/createGame', GamesController.handleCreateGameRequest);
 }
