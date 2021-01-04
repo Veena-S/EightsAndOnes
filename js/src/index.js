@@ -200,13 +200,13 @@ const createPlayerTokenArray = () => {
  */
 const startGame = () => {
   const boardSize = document.getElementById(BOARD_SIZE_COMBO_ID).value;
-  createBoard(boardSize);
   // An array of objects that holds info on players and their selected tokens
   const playerTokenArray = createPlayerTokenArray();
   console.log(`${boardSize}, ${playerTokenArray}, ${playersList}`);
   axios.post('/createGame', { boardSize, playerTokenArray, playersList })
     .then((response) => {
       console.log(response.data);
+      createBoard(boardSize);
     })
     .catch((err) => {
       console.log(err);
