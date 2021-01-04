@@ -18,7 +18,7 @@ export default function gamesUserModel(sequelize, DataTypes) {
           key: 'id',
         },
       },
-      PlayerId: {
+      UserId: {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
@@ -26,7 +26,7 @@ export default function gamesUserModel(sequelize, DataTypes) {
           key: 'id',
         },
       },
-      TokenId: {
+      GameTokenId: {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {

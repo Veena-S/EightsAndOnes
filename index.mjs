@@ -13,9 +13,12 @@ app.set('view engine', 'ejs');
 app.use(express.urlencoded({ extended: false }));
 
 app.use(express.static('public'));
+app.use(express.static('public/tokenImages'));
 app.use(express.static('js/dist'));
 
 app.use(methodOverride('_method'));
+
+app.use(express.json());
 
 // set the routes
 routes(app);

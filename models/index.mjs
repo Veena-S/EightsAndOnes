@@ -47,33 +47,35 @@ db.GameToken = gameTokenModel(sequelize, Sequelize.DataTypes);
 // Here it is through the join table "GamesUsers"
 db.User.belongsToMany(db.Game, { through: db.GamesUser });
 db.Game.belongsToMany(db.User, { through: db.GamesUser });
-// Also specify the super-many-to-many relationship
-db.GamesUser.belongsTo(db.User);
-db.User.hasMany(db.GamesUser);
-db.GamesUser.belongsTo(db.Game);
-db.Game.hasMany(db.GamesUser);
 
 // Association of GameTokens
 // A token can have many games.
 db.GameToken.belongsToMany(db.Game, { through: db.GamesUser });
 // A game can have many tokens.
 db.Game.belongsToMany(db.GameToken, { through: db.GamesUser });
+
 // A player can have many tokens
 db.User.belongsToMany(db.GameToken, { through: db.GamesUser });
 // A token can have many players
 db.GameToken.belongsToMany(db.User, { through: db.GamesUser });
+
 // Also specify the super-many-to-many relationship
+// GamesUser holds UserId
+db.GamesUser.belongsTo(db.User);
+db.User.hasMany(db.GamesUser);
+db.GamesUser.belongsTo(db.Game);
+db.Game.hasMany(db.GamesUser);
+// GameUser holds TokenId
 db.GamesUser.belongsTo(db.GameToken);
 db.GameToken.hasMany(db.GamesUser);
 
 // Also Users table is directly associated with Games table as 1 to Many association
-// A game can have a winner
 // Games table holds the user id as the winner id
 // A game can have only one winner
-// A user can be winner of many games
 // A user is associated with a Game directly
-db.Game.belongsTo(db.User);
-db.User.hasMany(db.Game);
+db.Game.belongsTo(db.User, { as: 'winner' }); // Adds winnerId to Games rather than userId
+// Game holds the UserId as winnerId
+// db.User.hasMany(db.Game, { as: 'winner' });
 
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;

@@ -33,6 +33,18 @@ module.exports = {
         createdAt: new Date(),
         updatedAt: new Date(),
       },
+      {
+        email: 'user3@games.com',
+        password: generatedHashedValue('user3'),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        email: 'user4@games.com',
+        password: generatedHashedValue('user4'),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     ];
 
     // Insert the users list

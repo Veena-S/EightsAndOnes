@@ -5,6 +5,7 @@
   "main": ".eslintrc.js",
   "scripts": {
     "start": "node index.mjs",
+    "debug": "node --inspect index.mjs",
     "watch": "webpack --watch --config config/webpack.dev.js",
     "build": "webpack --config config/webpack.prod.js"
   },

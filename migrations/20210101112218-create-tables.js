@@ -39,6 +39,7 @@ module.exports = {
         // It will hold the following data
         // last dice set thrown
         // last player
+        // next player
         // details of each cell - tokens present in a cell and owner of those tokens
         type: Sequelize.JSON,
       },
@@ -88,7 +89,7 @@ module.exports = {
           key: 'id',
         },
       },
-      PlayerId: {
+      UserId: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
@@ -96,7 +97,7 @@ module.exports = {
           key: 'id',
         },
       },
-      TokenId: {
+      GameTokenId: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
