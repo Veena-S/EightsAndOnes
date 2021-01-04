@@ -25,7 +25,7 @@ export default function games(db) {
      * playerTokenArray = An array of objects that holds info on players and their selected tokens
      */
     console.log(request.body);
-    const { boardSize, playerTokenArray, playersList } = request.body.data;
+    const { boardSize, playerTokenArray, playersList } = request.body;
     console.log(`boardSize: ${boardSize}`);
     console.log(`playerTokenArray: ${playerTokenArray}`);
     console.log(`playersList: ${playersList}`);

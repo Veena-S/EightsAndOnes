@@ -162,6 +162,7 @@ const createBoard = (boardSize) => {
     for (let colIndex = 0; colIndex < boardSize; colIndex += 1)
     {
       const divCol = document.createElement('div');
+      divCol.innerHTML = `<sup>(${rowIndex},${colIndex})</sup>`;
       divCol.setAttribute('id', `r-c-${rowIndex}-${colIndex}`);
       divCol.classList.add('col', 'board-cell', 'border');
       divRow.appendChild(divCol);
@@ -173,9 +174,15 @@ const createBoard = (boardSize) => {
  * Function to array of objects that holds info on players and their selected tokens
  */
 const createPlayerTokenArray = () => {
+  const playerCountSelected = document.getElementById(PLAYER_COUNT_COMBO_ID).value;
+  if (playerCountSelected > playersList.length)
+  {
+    console.log('Not enough players registered. Register one more player.');
+    return null;
+  }
   const playerTokenArray = [];
   let tokenIndex = 0;
-  for (let playerIndex = 0; playerIndex < playersList.length; playerIndex += 1)
+  for (let playerIndex = 0; playerIndex < playerCountSelected; playerIndex += 1)
   {
     const playerTokenInfo = {
       playerId: playersList[playerIndex].id,
@@ -192,7 +199,6 @@ const createPlayerTokenArray = () => {
  * Also, this function initiates the board drawing
  */
 const startGame = () => {
-  const playerCountSelected = document.getElementById(PLAYER_COUNT_COMBO_ID).value;
   const boardSize = document.getElementById(BOARD_SIZE_COMBO_ID).value;
   createBoard(boardSize);
   // An array of objects that holds info on players and their selected tokens
