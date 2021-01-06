@@ -74,8 +74,9 @@ db.GameToken.hasMany(db.GamesUser);
 // A game can have only one winner
 // A user is associated with a Game directly
 db.Game.belongsTo(db.User, { as: 'winner' }); // Adds winnerId to Games rather than userId
+
 // Game holds the UserId as winnerId
-// db.User.hasMany(db.Game, { as: 'winner' });
+db.User.hasMany(db.Game, { as: 'winner', foreignKey: 'winnerId' });
 
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;

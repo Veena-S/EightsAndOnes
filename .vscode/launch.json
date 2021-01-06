@@ -5,14 +5,6 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Attach by Port - Nodemon",
-      "port": 9229,
-      "restart": true,
-      "request": "attach",
-      "skipFiles": ["node_modules/**"],
-      "type": "pwa-node"
-    },
-    {
       "name": "Attach by Process ID - Nodemon",
       "processId": "${command:PickProcess}",
       "request": "attach",
@@ -20,6 +12,15 @@
       "skipFiles": ["node_modules/**"],
       "type": "pwa-node"
     },
+
+    // {
+    //   "name": "Attach by Port - Nodemon",
+    //   "port": 9229,
+    //   "restart": true,
+    //   "request": "attach",
+    //   "skipFiles": ["node_modules/**"],
+    //   "type": "pwa-node"
+    // },
 
     {
       "console": "integratedTerminal",

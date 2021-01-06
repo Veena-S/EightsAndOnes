@@ -5,6 +5,8 @@ const PLAYER_COUNT_COMBO_ID = 'player-count';
 const BOARD_SIZE_COMBO_ID = 'board-size';
 let gameTokensList = null;
 let playersList = null;
+// Current State of the board
+let currentBoardState = null;
 
 /**
  * Function that creates the select element with the options specified
@@ -129,7 +131,7 @@ const createBoardSelectCombo = () => {
   labelBoardSize.appendChild(labelValue);
   divComboBoardSize.appendChild(labelBoardSize);
 
-  const maxBoardSize = 13;
+  const maxBoardSize = 11;
   const minBoardSize = 5;
   const selectElement = document.createElement('select');
   selectElement.setAttribute('id', idValue);
@@ -146,19 +148,80 @@ const createBoardSelectCombo = () => {
 };
 
 /**
- * Function that displays the board of requested Size
- * @param {Numeric} boardSize - Size of board selected by the players
+ * Function that handles dice throw
  */
-const createBoard = (boardSize) => {
+const throwRollingSticksDice = () => {
+  const currentPlayerId = currentBoardState.nextPlayerId;
+  axios.post('/throwDice', { gameId: currentBoardState.gameId, currentPlayerId })
+    .then((response) => {
+      console.log(response.data);
+      currentBoardState = response.data.currentBoardState;
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+};
+
+/**
+ * Function that draws the board as per the size selected
+ * @param {*} boardSize - board Size
+ *
+    -------------------------------------------
+    |                   P1                    |
+    |     |-----|-----|------|-----|-----|    |
+    |     |-----|-----|------|-----|-----|    |
+    |     |-----|-----|------|-----|-----|    |
+    |  P2 |-----|-----|------|-----|-----| P4 |
+    |     |-----|-----|------|-----|-----|    |
+    |     |_____|_____|______|_____|_____|    |
+    |                   P3                    |
+    -------------------------------------------
+ */
+const drawBoard = (boardSize) => {
   const divPlayingBoard = document.getElementById('div-playing-board');
   divPlayingBoard.classList.add('container', 'board-container');
+
+  // Adding an outer container before the board originally starts.
+  // This is to add the player and tokens information
+  // 3 Main rows, 2nd row has 3 columns in which 2 nd column has the game board
+
+  const divOuterGameBoard = document.getElementById('div-outer-game-board');
+  const divTopRow = document.createElement('div');
+  divTopRow.setAttribute('id', 'top-player');
+  divTopRow.classList.add('row', 'border');
+  divOuterGameBoard.appendChild(divTopRow);
+
+  const divMiddleRow = document.createElement('div');
+  divMiddleRow.classList.add('row', 'border');
+  divOuterGameBoard.appendChild(divMiddleRow);
+
+  const divBottomRow = document.createElement('div');
+  divBottomRow.setAttribute('id', 'bottom-player');
+  divBottomRow.classList.add('row', 'border');
+  divOuterGameBoard.appendChild(divBottomRow);
+
+  // Add 3 columns to the middle row
+  const divLeftCol = document.createElement('div');
+  divLeftCol.classList.add('col');
+  divLeftCol.setAttribute('id', 'left-player');
+  divMiddleRow.appendChild(divLeftCol);
+
+  const divMiddleCol = document.createElement('div');
+  divMiddleCol.classList.add('col');
+  divMiddleRow.appendChild(divMiddleCol);
+
+  const divRightCol = document.createElement('div');
+  divRightCol.classList.add('col');
+  divRightCol.setAttribute('id', 'right-player');
+  divMiddleRow.appendChild(divRightCol);
+
   // Board of size n x n
   for (let rowIndex = 0; rowIndex < boardSize; rowIndex += 1)
   {
     const divRow = document.createElement('div');
     divRow.setAttribute('id', `r-${rowIndex}`);
     divRow.classList.add('row', 'board-row');
-    divPlayingBoard.appendChild(divRow);
+    divMiddleCol.appendChild(divRow);
     for (let colIndex = 0; colIndex < boardSize; colIndex += 1)
     {
       const divCol = document.createElement('div');
@@ -168,6 +231,15 @@ const createBoard = (boardSize) => {
       divRow.appendChild(divCol);
     }
   }
+};
+
+/**
+ * Function that displays the board of requested Size
+ * @param {Numeric} boardSize - Size of board selected by the players
+ */
+const createBoard = (boardSize) => {
+  drawBoard(boardSize);
+  // Mark the players and the tokens near the respective entry positions
 };
 
 /**
@@ -186,6 +258,7 @@ const createPlayerTokenArray = () => {
   {
     const playerTokenInfo = {
       playerId: playersList[playerIndex].id,
+      playerEmail: playersList[playerIndex].email,
       tokenId: gameTokensList[tokenIndex].id,
     };
     playerTokenArray.push(playerTokenInfo);
@@ -206,6 +279,7 @@ const startGame = () => {
   axios.post('/createGame', { boardSize, playerTokenArray, playersList })
     .then((response) => {
       console.log(response.data);
+      currentBoardState = response.data.currentBoardState;
       createBoard(boardSize);
     })
     .catch((err) => {

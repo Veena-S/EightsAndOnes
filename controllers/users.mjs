@@ -67,7 +67,9 @@ export default function users(dbModels) {
    */
   const getAllUsers = (request, response) => {
     console.log('getAllUsers');
-    dbModels.User.findAll()
+    dbModels.User.findAll({
+      attributes: ['id', 'email'],
+    })
       .then((returnedUsers) => {
         // console.log(returnedUsers.toJSON());
         // response.send(returnedUsers.toJSON());
