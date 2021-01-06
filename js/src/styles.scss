@@ -7,6 +7,27 @@ body {
   display: inline;
 }
 
+#top-player {
+  justify-content: center;
+}
+
+.player-name {
+  width: fit-content;
+}
+
+.token-image {
+  width: 27px;
+  height: 27px;
+  // background-image: url("");
+  background-size: contain;
+  border: 1px solid rgb(245, 242, 197);
+  margin: 1px;
+  background-repeat: no-repeat;
+
+  resize: both;
+  overflow: auto;
+}
+
 // sup {
 //   position: absolute;
 //   top: 0; /* top: 0; */

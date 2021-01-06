@@ -23,6 +23,7 @@ export default function routes(app) {
   const GamesController = games(db);
   // Request handler for creating a new game
   app.post('/createGame', GamesController.handleCreateGameRequest);
+  app.post('/throwDice', GamesController.handlePlayRollingDiceSticks);
 
   // Tokens controller function object
   const TokensController = tokens(db);

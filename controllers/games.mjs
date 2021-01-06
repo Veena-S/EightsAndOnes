@@ -24,17 +24,34 @@ const traversePathDirections = Object.freeze({
 const getRandomValue = (maxSize) => Math.floor(Math.random() * maxSize);
 
 const DICE_COUNT = 4;
+
+const calculateTotalDiceValue = (rolledValues) => {
+  const sum = rolledValues.reduce((total, current) => total + current, 0);
+  // 0 or 1. 0 is considered to be inner side
+  switch (sum)
+  {
+    case 0: { return 4; } // 0000 => rolled value is 4 => sum = 0
+    case 1: { return 3; } // 0001 => rolled value is 3 => sum = 1
+    case 2: { return 2; } // 0011 => rolled value is 2 => sum = 2
+    case 3: { return 1; } // 0111 => rolled value is 1 => sum = 3
+    case 4: { return 8; } // 1111 => rolled value is 8 => sum = 4
+    default: { return 0; }
+  }
+};
+
 /**
  * Function that rolls the dice sticks
  */
 const rollDiceSticks = function () {
-  const maxSize = 1;
+  const maxSize = 2;
   const rolledValues = [];
   for (let index = 0; index < DICE_COUNT; index += 1)
   {
-    rolledValues.push((getRandomValue(maxSize)) + 1);
+    // 0 or 1. 0 is considered to be inner side
+    rolledValues.push((getRandomValue(maxSize)));
   }
-  return rolledValues;
+  const totalDicedValue = calculateTotalDiceValue(rolledValues);
+  return { rolledValues, totalDicedValue };
 };
 
 /**
@@ -762,6 +779,7 @@ export default function games(db) {
         msg: 'New game creation success!!',
         gameId: newGame.id,
         currentBoardState: newGame.boardState,
+        gameUsersTokensList: newGameUsers,
       });
     }
     catch (error)
@@ -772,17 +790,55 @@ export default function games(db) {
   };
 
   /**
+ * Function to identify the next player
+ * @param gameId - Game id
+ * @param currentPlayerId - The player currently rolled dice
+ */
+  const getNextPlayerId = async (gameId, currentPlayerId) => {
+    console.log('getNextPlayerId');
+    // Get the player info from the GameUsersTable
+    const gameUserData = await db.GamesUser.findAll({ where: { GameId: gameId } });
+    if (undefined === gameUserData)
+    {
+      return -1;
+    }
+    /**
+     * From the returned data get the GameUsers Table id of the currentPlayerId
+     * Then the player for the next id is considered to be the next player.
+     * If the current player is the last of the list, first in the list will be the next player
+     */
+    const currentPlayerIndex = gameUserData.findIndex((data) => (data.UserId === currentPlayerId));
+    if (currentPlayerIndex === -1)
+    {
+      return -1;
+    }
+    const nextPlayerIndex = (currentPlayerIndex === (gameUserData.length - 1))
+      ? 0 : (currentPlayerIndex + 1);
+    return gameUserData[nextPlayerIndex].UserId;
+  };
+
+  /**
    * Function that handing the request to roll dice by a player
    * @param request - request
    * @param response - response
    */
   const handlePlayRollingDiceSticks = async (request, response) => {
     console.log('handlePlayRollingDiceSticks');
+    if (request.body === undefined)
+    {
+      response.status(500).send({ gameStatus: 'error', msg: 'Not enough data to proceed' });
+      return;
+    }
     const { gameId, currentPlayerId } = request.body;
     try
     {
       // get the game corresponding to the id given
       const currentGame = await db.Game.findByPk(gameId);
+      if (currentGame === null || currentGame === undefined)
+      {
+        response.status(500).send({ gameStatus: 'error', msg: 'This game doesn\'t exists. Please Start the game' });
+        return;
+      }
       // Validate the current player is the one who is expected to be playing
       const expectedPlayerId = currentGame.boardState.nextPlayerId;
       if (currentPlayerId !== expectedPlayerId)
@@ -795,8 +851,30 @@ export default function games(db) {
       // Throw the Dice and store that value in the database
       // Last and next players will also be updated, once the dice is thrown.
       // It will be updated only in 2 cases: when dice is thrown or when a player is won
-      currentGame.boardState.lastDiceSet = rollDiceSticks();
-      currentGame.boardState.lastPlayerId = currentPlayerId;
+      const rollingData = rollDiceSticks();
+      const nextPlayerId = await getNextPlayerId(gameId, currentPlayerId);
+      // const { boardState } = currentGame;
+      // await currentGame.update({ boardState });
+      await currentGame.update({
+        boardState: {
+          boardSize: currentGame.boardState.boardSize,
+          lastDiceSet: rollingData.rolledValues, // updated value
+          lastPlayerId: currentPlayerId, // updated Value
+          nextPlayerId, // updated value
+          boardCornersAndSafePos: currentGame.boardState.boardCornersAndSafePos,
+          playersEntryPoint: currentGame.boardState.playersEntryPoint,
+          traversePaths: currentGame.boardState.traversePaths,
+          tokenPositions: currentGame.boardState.tokenPositions,
+        },
+      });
+
+      response.status(200).send({
+        gameStatus: 'success',
+        msg: 'Dice played successfully!!',
+        gameId: currentGame.id,
+        currentBoardState: currentGame.boardState,
+        totalDicedValue: rollingData.totalDicedValue,
+      });
     }
     catch (err)
     {

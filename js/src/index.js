@@ -1,12 +1,72 @@
 import axios from 'axios';
+import { image } from 'faker';
 import './styles.scss';
 
 const PLAYER_COUNT_COMBO_ID = 'player-count';
 const BOARD_SIZE_COMBO_ID = 'board-size';
 let gameTokensList = null;
-let playersList = null;
-// Current State of the board
-let currentBoardState = null;
+let playersList = null; // id, email
+let currentBoardState = null; // Current State of the board
+let gameUsersTokensList = null; // Array[Mapping of gameId - PlayerId - TokenID]
+let gameId = -1; // Current game's id
+let totalDicedValue = 0; // recently played dice value
+
+const setGameIdAndBoardState = (data) => {
+  gameId = data.gameId;
+  currentBoardState = data.currentBoardState;
+  if (data.gameUsersTokensList !== undefined || data.gameUsersTokensList !== null)
+  {
+    gameUsersTokensList = data.gameUsersTokensList;
+  }
+};
+
+// Comparing 2 arrays having [row, col]
+const comparePositionArrays = (firstPosArray, secondPosArray) => {
+  if (!Array.isArray(firstPosArray) || !Array.isArray(secondPosArray))
+  {
+    return false;
+  }
+  // length should be equal
+  if (firstPosArray.length !== secondPosArray.length)
+  {
+    return false;
+  }
+  let bFound = true;
+  firstPosArray.forEach((first, index) => {
+    console.log(`first:${first}`);
+    console.log(`secondPosArray[index]:${secondPosArray[index]}`);
+    if (secondPosArray[index] !== first)
+    {
+      bFound = false;
+    }
+  });
+  return bFound;
+};
+
+/**
+ * Function to find the token id and image path for a player
+ * @param {Numeric} playerId - Player id
+ */
+const findTokenDetailsForPlayer = (playerId) => {
+  // console.log(`gameUsersTokensList: ${gameUsersTokensList}, playerId: ${playerId}`);
+  // gameUsersTokensList.forEach((item, index) => {
+  //   console.log(`gameUsersTokensList-${index}, value: ${item}`);
+  //   console.log(`gameUsersTokensList-${index}-Keys, value: ${Object.keys(item)}`);
+  // });
+
+  // eslint-disable-next-line max-len
+  const gameUserTokenData = gameUsersTokensList.find((element) => (Number(element.UserId) === Number(playerId)));
+
+  // console.log(`gameUserTokenData: ${gameUserTokenData}`);
+
+  if (undefined === gameUserTokenData)
+  {
+    return undefined;
+  }
+  // Check for the token id in gameTokensList
+  const gameToken = gameTokensList.find((token) => (token.id === gameUserTokenData.GameTokenId));
+  return gameToken;
+};
 
 /**
  * Function that creates the select element with the options specified
@@ -101,7 +161,7 @@ const createPlayerCountCombo = () => {
   // To DO: Chnage the random selection of users
   selectElement.addEventListener('change', selectRandomPlayers);
 
-  const optionsList = [1, 2, 3, 4];
+  const optionsList = [0, 1, 2, 3, 4];
 
   // Create options
   optionsList.forEach((optionValue) => {
@@ -152,10 +212,16 @@ const createBoardSelectCombo = () => {
  */
 const throwRollingSticksDice = () => {
   const currentPlayerId = currentBoardState.nextPlayerId;
-  axios.post('/throwDice', { gameId: currentBoardState.gameId, currentPlayerId })
+  axios.post('/throwDice', { gameId, currentPlayerId })
     .then((response) => {
       console.log(response.data);
-      currentBoardState = response.data.currentBoardState;
+      totalDicedValue = response.data.totalDicedValue;
+      setGameIdAndBoardState(response.data);
+
+      const divRolledDiceValues = document.getElementById('div-rolled-values');
+      const pTotalValueEl = document.createElement('p');
+      pTotalValueEl.innerText = `Player: ${currentPlayerId} - Rolled Value: ${totalDicedValue}`;
+      divRolledDiceValues.appendChild(pTotalValueEl);
     })
     .catch((err) => {
       console.log(err);
@@ -202,7 +268,7 @@ const drawBoard = (boardSize) => {
 
   // Add 3 columns to the middle row
   const divLeftCol = document.createElement('div');
-  divLeftCol.classList.add('col');
+  divLeftCol.classList.add('col-1');
   divLeftCol.setAttribute('id', 'left-player');
   divMiddleRow.appendChild(divLeftCol);
 
@@ -211,7 +277,7 @@ const drawBoard = (boardSize) => {
   divMiddleRow.appendChild(divMiddleCol);
 
   const divRightCol = document.createElement('div');
-  divRightCol.classList.add('col');
+  divRightCol.classList.add('col-1');
   divRightCol.setAttribute('id', 'right-player');
   divMiddleRow.appendChild(divRightCol);
 
@@ -233,13 +299,112 @@ const drawBoard = (boardSize) => {
   }
 };
 
+function onDragToken(ev) {
+// Add the target element's id to the data transfer object
+  ev.dataTransfer.setData('text/plain', ev.target.id);
+}
+
+/**
+ * Function that marks the position of players and respective tokens in the board
+ */
+const markPlayersInitialPosition = () => {
+  console.log('markPlayersInitialPosition');
+  Object.keys(currentBoardState.playersEntryPoint).forEach((playerId) => {
+    console.log(playerId);
+
+    const { entryPoint } = currentBoardState.playersEntryPoint[playerId];
+
+    console.log(entryPoint);
+
+    // Check for this entry point in the boardCornersAndSafePos
+    // Depending on that, place the players tokens in the board
+    const {
+      topCentrePos, leftCentrePos, rightCentrePos, bottomCentrePos,
+    } = currentBoardState.boardCornersAndSafePos.EntryPoints;
+    const playerEmailShort = currentBoardState.playersEntryPoint[playerId].playerEmail.split('@', 1);
+    const pElPlayer = document.createElement('p');
+    pElPlayer.innerText = playerEmailShort;
+
+    console.log(`playerEmailShort:${playerEmailShort}`);
+
+    const gameTokenInfo = findTokenDetailsForPlayer(playerId);
+
+    // console.log(`gameTokenInfo:${gameTokenInfo}`);
+
+    let divIdValue = '';
+    if (comparePositionArrays(entryPoint, topCentrePos))
+    {
+      // Place it as the top-player element
+      divIdValue = 'top-player';
+    }
+    else if (comparePositionArrays(entryPoint, leftCentrePos))
+    {
+      // left-player
+      divIdValue = 'left-player';
+    }
+    else if (comparePositionArrays(entryPoint, rightCentrePos))
+    {
+      // right-player
+      divIdValue = 'right-player';
+    }
+    else if (comparePositionArrays(entryPoint, bottomCentrePos))
+    {
+      // bottom-player
+      divIdValue = 'bottom-player';
+    }
+    console.log(divIdValue);
+    const divEl = document.getElementById(divIdValue);
+    console.log(divEl);
+    if (divEl !== null || divEl !== undefined)
+    {
+      console.log('Appending player name element');
+
+      pElPlayer.classList.add('player-name');
+      divEl.appendChild(pElPlayer);
+      // create the token element and append
+      for (let indexToken = 0; indexToken < 4; indexToken += 1)
+      {
+        // const tokenImgEl = document.createElement('img');
+        // tokenImgEl.setAttribute('src', gameTokenInfo.imageFilePath);
+        // tokenImgEl.classList.add('token-image');
+        // tokenImgEl.draggable = true;
+        // // Add the ondragstart event listener
+        // tokenImgEl.addEventListener('dragstart', onDragToken);
+
+        // to do: resize css property
+        // try with img element inside a p element.
+        // check the border is only aroung the img
+
+        const imageContainerEl = document.createElement('p');
+        // imageContainerEl.classList.add('col');
+        // imageCol.appendChild(tokenImgEl);
+        imageContainerEl.style.backgroundImage = `url(${gameTokenInfo.imageFilePath})`;
+        imageContainerEl.classList.add('token-image');
+        imageContainerEl.draggable = true;
+        imageContainerEl.addEventListener('dragstart', onDragToken);
+        divEl.appendChild(imageContainerEl);
+      }
+    }
+  });
+};
+
 /**
  * Function that displays the board of requested Size
  * @param {Numeric} boardSize - Size of board selected by the players
  */
 const createBoard = (boardSize) => {
   drawBoard(boardSize);
+
   // Mark the players and the tokens near the respective entry positions
+  markPlayersInitialPosition();
+
+  // Add buttons necessary for playing
+  const divPlayGroupButtons = document.getElementById('div-play-group-buttons');
+  const btnThrowDice = document.createElement('button');
+  btnThrowDice.setAttribute('id', 'btn-throw-dice');
+  btnThrowDice.innerText = 'Roll Stick Dice';
+  btnThrowDice.addEventListener('click', throwRollingSticksDice);
+  divPlayGroupButtons.appendChild(btnThrowDice);
 };
 
 /**
@@ -279,7 +444,7 @@ const startGame = () => {
   axios.post('/createGame', { boardSize, playerTokenArray, playersList })
     .then((response) => {
       console.log(response.data);
-      currentBoardState = response.data.currentBoardState;
+      setGameIdAndBoardState(response.data);
       createBoard(boardSize);
     })
     .catch((err) => {
