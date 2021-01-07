@@ -229,27 +229,23 @@ const throwRollingSticksDice = () => {
 };
 
 // Function that handles the dragging event
+// This event is fired when the user starts dragging an element or text selection.
 function onDragStartToken(ev) {
-  // ev.currentTarget.style.border = 'dashed';
-
   // Add the target element's id to the data transfer object
   // ev.dataTransfer.setData('application/x-moz-node', ev.target.id);
   ev.dataTransfer.setData('text/plain', ev.target.id);
-
-  let data = ev.dataTransfer.getData('application/x-moz-node');
-  console.log('onDragToken:getData-', data);
-  data = ev.dataTransfer.getData('application');
-  console.log('onDragToken:getData-', data);
-
-  console.log('`onDragToken: ev.target.id-', ev.target.id, 'typeOf:', typeof (ev.target));
+  console.log('onDragToken: ev.target.id-', ev.target.id, 'typeOf:', typeof (ev.target));
 }
 
 // Function to handle "ondragover" event
+// This event is fired continuously when an element or text selection
+// is being dragged and the mouse pointer is over a valid drop target
 function onDragOver(ev) {
   ev.preventDefault();
 }
 
 // Function to handle "ondrop" event
+// This event is fired when an element or text selection is dropped on a valid drop target.
 function onDrop(ev) {
   ev.preventDefault();
   const data = ev.dataTransfer.getData('text');
