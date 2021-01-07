@@ -681,6 +681,94 @@ const findTraversePaths = (boardSize, boardCornersAndSafePos, playersList) => {
 };
 
 /**
+ * Function to check whether a position given is inside or outside the game board
+ * @param posToCompare - [row,col] to be compared
+ * @param boardSize - size of the board
+ */
+const isPosOutsideBoard = (posToCompare, boardSize) => {
+  let bOutside = false;
+  posToCompare.forEach((pos) => {
+    if (!bOutside)
+    {
+      bOutside = ((pos < 0) || (pos >= boardSize));
+    }
+  });
+  return bOutside;
+};
+
+/**
+ * Function to check whether 2 cell positions are equal
+ * @param firstCellPos - first cell
+ * @param secondCellPos - second cell
+ */
+const areCellsEqual = (firstCellPos, secondCellPos) => {
+  if (firstCellPos.length !== secondCellPos.length)
+  {
+    return false;
+  }
+  const { length } = firstCellPos;
+  let bEqual = true;
+  for (let counter = 0; counter < length; counter += 1)
+  {
+    if (firstCellPos[counter] !== secondCellPos[counter])
+    {
+      bEqual = false;
+      break;
+    }
+  }
+  return bEqual;
+};
+
+// /**
+//  * Function to find the cell that is located after "n" cells from the given source cell,
+//  * in the traversing path of a particular player.
+//  * @param sourceCell - cell from which the counting should start
+//  * @param cellCount - number of cells to move forward
+//  * @param currentPlayerId - current player
+//  * @param currentBoardState - current board state of the game
+//  */
+// const findCellAfterNCellsInTraversePath = (sourceCell, cellCount, currentPlayerId, currentBoardState) => {
+
+// };
+
+/**
+ * Function to find the number of cells present between Source Cell and Target Cell.
+ * Excludes the source cell and includes the target cell
+ * @param sourceCell - cell after which the counting should start
+ * @param targetCell - cell until which the counting should end
+ * @param currentPlayerId - current player
+ * @param currentBoardState - current board state of the game
+ */
+const countCellFromSourceToTargetInPath = (sourceCell, targetCell,
+  currentPlayerId, currentBoardState) => {
+  // Get the traverse path corresponding to the player's entry point
+  const { entryPoint } = currentBoardState.playersEntryPoint[currentPlayerId];
+  const traversePath = currentBoardState.traversePaths[entryPoint.join('-')];
+  // Find the index of the source and target cells in the traverse path
+  const sourceCellIndex = traversePath.findIndex(
+    (pathCell) => (areCellsEqual(sourceCell, pathCell)),
+  );
+  if (sourceCellIndex === -1)
+  {
+    return 0;
+  }
+  // Find the index of target cell
+  const targetCellIndex = traversePath.findIndex(
+    (pathCell) => (areCellsEqual(targetCell, pathCell)),
+  );
+  if (targetCellIndex === -1)
+  {
+    return 0;
+  }
+  const cellCount = targetCellIndex - sourceCellIndex;
+  if (cellCount <= 0)
+  {
+    return 0;
+  }
+  return cellCount;
+};
+
+/**
  *
  * Controller Section
  *
@@ -790,6 +878,32 @@ export default function games(db) {
   };
 
   /**
+   * Function to validate the current player is same as the tokens player.
+   * Also, verify the this player has the right to use that token in this game
+   * @param gameId
+   * @param currentPlayerId
+   * @param tokenId
+   * @param tokensPlayerId
+   */
+  const verifyPlayerAndTokensPlayer = async (gameId, currentPlayerId, tokenId, tokensPlayerId) => {
+    console.log('verifyPlayerAndTokensPlayer');
+    // Get the player info from the GameUsersTable
+    const gameUserData = await db.GamesUser.findAll({
+      where: { GameId: gameId, UserId: currentPlayerId, GameTokenId: tokenId },
+    });
+    if (undefined === gameUserData)
+    {
+      return ({ valid: false, msg: 'Validation failed. Player is not autorized to make this move.' });
+    }
+    // Validate the player - check whether the token belongs to the player whose turn it is
+    if ((currentPlayerId !== tokensPlayerId))
+    {
+      return ({ isValid: false, msg: 'Validation failed. Token doesn\'t belong to the player.' });
+    }
+    return ({ isValid: true, msg: 'Player and token validation successfull.' });
+  };
+
+  /**
  * Function to identify the next player
  * @param gameId - Game id
  * @param currentPlayerId - The player currently rolled dice
@@ -826,7 +940,7 @@ export default function games(db) {
     console.log('handlePlayRollingDiceSticks');
     if (request.body === undefined)
     {
-      response.status(500).send({ gameStatus: 'error', msg: 'Not enough data to proceed' });
+      response.status(400).send({ gameStatus: 'error', msg: 'Not enough data to proceed' });
       return;
     }
     const { gameId, currentPlayerId } = request.body;
@@ -836,7 +950,7 @@ export default function games(db) {
       const currentGame = await db.Game.findByPk(gameId);
       if (currentGame === null || currentGame === undefined)
       {
-        response.status(500).send({ gameStatus: 'error', msg: 'This game doesn\'t exists. Please Start the game' });
+        response.status(400).send({ gameStatus: 'error', msg: 'This game doesn\'t exists. Please Start the game' });
         return;
       }
       // Validate the current player is the one who is expected to be playing
@@ -844,7 +958,7 @@ export default function games(db) {
       if (currentPlayerId !== expectedPlayerId)
       {
         // Validation failed. Send error response.
-        response.status(500).send({ gameStatus: 'error', msg: `Wrong Player. Expected player: ${currentGame.playersEntryPoint[expectedPlayerId].playerEmail}` });
+        response.status(400).send({ gameStatus: 'error', msg: `Wrong Player. Expected player: ${currentGame.playersEntryPoint[expectedPlayerId].playerEmail}` });
         return;
       }
       // Player is valid
@@ -884,60 +998,230 @@ export default function games(db) {
   };
 
   /**
+   * Function that performs the movement of token to the specified cell
+   * and update the data in database
+   * @param currentGame - Current Game model object
+   * @param requestTokenData - Input token details
+   * @param countOfCellsToMove - number of cell moving or the value
+   *                    which is decreased from the remaining value
+   *                    Useful in the case where the rolledValue is 4,
+   *                    and moved cell count is 1, 2 or 3
+   */
+  const moveAndUpdateTokenData = async (currentGame, requestTokenData, countOfCellsToMove) => {
+    try
+    {
+    /**
+     * Values to be updated are
+     * In requestTokenData,  remainingDiceValue, tokenCell position
+     * In the game data -> tokenPositions
+     */
+
+      if (requestTokenData.remainingDiceValue < countOfCellsToMove)
+      {
+        console.log('Remaining value to moved is less than the actual value to be moved.');
+        return undefined;
+      }
+      requestTokenData.remainingDiceValue -= countOfCellsToMove;
+      requestTokenData.movedTokenData.currentPos = [...requestTokenData.targetCellPos];
+      const tokenPos = requestTokenData.targetCellPos.join('-');
+
+      // Update the game table
+      const updatedGame = await currentGame.update({
+        boardState: {
+          ...currentGame.boardState,
+          tokenPositions: { // updated value
+            // For each pos, it will be an array of tokens.
+            // An array is kept considering the case of centre point and safe cells
+            [tokenPos]: [{
+              playerdId: requestTokenData.currentPlayerId,
+              tokenId: requestTokenData.movedTokenData.tokenId,
+            }],
+          },
+        },
+      });
+      return updatedGame;
+    }
+    catch (error)
+    {
+      console.log(error);
+      return undefined;
+    }
+  };
+
+  /**
    * Function that validates the token movement requested and if success, update the db too
    * @param request
    * @param response
    */
-  const handleValidateTokenMoveRequest = (request, response) => {
+  const handleValidateTokenMoveRequest = async (request, response) => {
     console.log('handleValidateTokenMoveRequest');
-    // const requestData = { ...request.body };
+    try
+    {
+      const requestData = { ...request.body };
+      // Get the game details
+      const currentGame = await db.Game.findByPk(requestData.gameId);
+      if (currentGame === null || currentGame === undefined)
+      {
+        response.status(400).send({ isValid: false, gameStatus: 'error', msg: 'This game doesn\'t exist. Please Start the game' });
+        return;
+      }
+      // Validate the player - and tokens
+      const validResult = await verifyPlayerAndTokensPlayer(requestData.gameId,
+        requestData.currentPlayerId, requestData.movedTokenData.tokenId,
+        requestData.movedTokenData.tokenBelongsTo);
 
-    /**
-     * gameId,
-    currentPlayerId,
-    movedTokenData: {
-      tokenBelongsTo: spanTokensPlayerElement.innerText,
-      tokenId: spanTokensIDElement.innerText,
-      currentPos: spanCurrentTokenPosElement.innerText.split(','),
-    },
-    sourceCellData: {
-      cellPos: spanCurrentTokenPosElement.innerText.split(','),
-    },
-    targetCellData: {
-      cellPos: targetNodeElement.innerText.split(','),
-    },
-     */
+      console.log(validResult.msg);
+      if (!validResult.isValid)
+      {
+        response.status(400).send({ isValid: false, gameStatus: 'error', msg: validResult.msg });
+        return;
+      }
+      // Is the source position is inside or outside the board?
+      const isSrcOutsideBoard = isPosOutsideBoard(requestData.sourceCellPos);
+      const isTargetOutsideBoard = isPosOutsideBoard(requestData.targetCellPos);
+      // 1. outside to outside => Not Valid
+      if (isSrcOutsideBoard && isTargetOutsideBoard)
+      {
+        response.status(200).send({ isValid: false, gameStatus: 'success', msg: 'Movement is not needed here' });
+        return;
+      }
+      // 2. Outside to inside
+      if (isSrcOutsideBoard && !isTargetOutsideBoard)
+      {
+        // Token can be moved from outside to inside, only if the rolled value is 1 or 4
+        if (requestData.totalDicedValue !== 4 && requestData.totalDicedValue !== 1)
+        {
+          response.status(200).send({
+            isValid: false,
+            gameStatus: 'success',
+            msg: 'Movement is not allowed. Roll value mosut be either 1 or 4',
+          });
+          return;
+        }
+        // if the roll value is 1
+        if (requestData.totalDicedValue === 1)
+        {
+          // check and move the token to the target cell specified
+          // As it's the entry and dice value is 1, target cell is entrypoint
+          // Find the entry point for the player
+          // eslint-disable-next-line max-len
+          const expectedTargetCell = currentGame.boardState.playersEntryPoint[requestData.currentPlayerId].entryPoint;
+          // check whether the expected and specified targets are same
+          if (!areCellsEqual(expectedTargetCell, requestData.targetCellPos))
+          {
+            response.status(400).send({
+              isValid: false,
+              gameStatus: 'error',
+              msg: `Token can't be moved to that cell. Rolled dice value is: ${requestData.totalDicedValue}. Place token in the entry cell.`,
+            });
+            return;
+          }
+          // Yes. Expected == Specified. Carry on with token movement
+          const updatedGameData = await moveAndUpdateTokenData(currentGame,
+            requestData, requestData.totalDicedValue);
 
-    // if (spanCurrentTokenPosElement.innerText === '-1,-1')
-    // {
-    // // It is moved from the outer board
-    // // If target location is also outer-board, nothing to move
-    //   if (targetNodeElement.getElementsByClassName('outer-board-pos') === undefined)
-    //   {
-    //     return false;
-    //   }
-    //   // Check whether the movement is valid - only for dice values 1 & 4 it can be moved to inside
-    //   if ((totalDicedValue !== 1) && (totalDicedValue !== 4) && (remainingDiceValue === 0))
-    //   {
-    //     return false;
-    //   }
-    // }
-  };
+          response.status(200).send({
+            isValid: true,
+            gameStatus: 'success',
+            msg: 'Updated the token position.',
+            gameId: updatedGameData.id,
+            currentBoardState: updatedGameData.boardState,
+            totalDicedValue: requestData.totalDicedValue,
+            remainingDiceValue: requestData.remainingDiceValue,
+            movedTokenData: requestData.movedTokenData,
+          });
+          return;
+        }
+        // if (requestData.totalDicedValue === 4)
+        // Is this as part of a new roll dice or continuation of a previous throw?
+        // const isFirstMovementAfterRoll = (requestData.totalDicedValue
+        //                                 === requestData.remainingDiceValue);
+        // Mainly applicable for value = 4
+        // Player can choose any value between 1 and 4, both values including
+        // Validate the specified target cell comes under the remainingDiceValue
+        const numOfCellsToTarget = countCellFromSourceToTargetInPath(requestData.sourceCellPos,
+          requestData.targetCellPos, requestData.currentPlayerId, currentGame.boardState);
+        if ((numOfCellsToTarget === 0) || (numOfCellsToTarget > requestData.remainingDiceValue))
+        {
+          // Number of cells between source and target is greater than
+          // the maximum allowed cell count.
+          // Send failure response
+          response.status(400).send({
+            isValid: false,
+            gameStatus: 'error',
+            msg: 'Target position exceeds the rolled dice value.',
+          });
+          return;
+        }
 
-  const handleMoveTokensRequest = (request, response) => {
-    // 1. Read the tokens currently moved
-    // 2. From Pos & ToPos
-    // 3. Validate
-    //    Is toPos is allowed?
-    //    Is there any other tokens present in the toPos?
-    // 4. Update the tokenPositions
+        // The target position specified is correct.
+        // Move the token to the target cell and update db
+        const updatedGameData = await moveAndUpdateTokenData(currentGame,
+          requestData, numOfCellsToTarget);
+        response.status(200).send({
+          isValid: true,
+          gameStatus: 'success',
+          msg: 'Updated the token position.',
+          gameId: updatedGameData.id,
+          currentBoardState: updatedGameData.boardState,
+          totalDicedValue: requestData.totalDicedValue,
+          remainingDiceValue: requestData.remainingDiceValue,
+          movedTokenData: requestData.movedTokenData,
+        });
+        return;
+      }
+      // 3. If both are inside
+      if (!isSrcOutsideBoard && !isTargetOutsideBoard)
+      {
+        // If source and target are inside, just move the token from the source by the dice value
+        // Check whether (source cell + dice value ) = target cell
+        const numOfCellsToTarget = countCellFromSourceToTargetInPath(requestData.sourceCellPos,
+          requestData.targetCellPos, requestData.currentPlayerId, currentGame.boardState);
+        if ((numOfCellsToTarget === 0) || (numOfCellsToTarget > requestData.totalDicedValue))
+        {
+          // Number of cells between source and target is greater than
+          // the maximum allowed cell count.
+          // Send failure response
+          response.status(400).send({
+            isValid: false,
+            gameStatus: 'error',
+            msg: 'Target position exceeds the rolled dice value.',
+          });
+          return;
+        }
+        // The target position specified is correct.
+        // Move the token to the target cell and update db
+        const updatedGameData = await moveAndUpdateTokenData(currentGame,
+          requestData, requestData.totalDicedValue);
+        response.status(200).send({
+          isValid: true,
+          gameStatus: 'success',
+          msg: 'Updated the token position.',
+          gameId: updatedGameData.id,
+          currentBoardState: updatedGameData.boardState,
+          totalDicedValue: requestData.totalDicedValue,
+          remainingDiceValue: requestData.remainingDiceValue,
+          movedTokenData: requestData.movedTokenData,
+        });
+        return;
+      }
+      // 4. From inside to outside
+      if (!isSrcOutsideBoard && isTargetOutsideBoard)
+      {
 
+      }
+    }
+    catch (error)
+    {
+      console.log(error);
+      response.status(500).send({ gameStatus: 'error', msg: 'Validation failed' });
+    }
   };
 
   return {
     handleCreateGameRequest,
     handlePlayRollingDiceSticks,
-    handleMoveTokensRequest,
+    // handleMoveTokensRequest,
     handleValidateTokenMoveRequest,
   };
 }

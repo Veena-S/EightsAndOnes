@@ -21,6 +21,11 @@ const setGameIdAndBoardState = (data) => {
   }
 };
 
+const setDiceRollValues = (totalValue, remainingValue) => {
+  totalDicedValue = totalValue;
+  remainingDiceValue = remainingValue;
+};
+
 // Comparing 2 arrays having [row, col]
 const comparePositionArrays = (firstPosArray, secondPosArray) => {
   if (!Array.isArray(firstPosArray) || !Array.isArray(secondPosArray))
@@ -216,8 +221,7 @@ const throwRollingSticksDice = () => {
   axios.post('/throwDice', { gameId, currentPlayerId })
     .then((response) => {
       console.log(response.data);
-      totalDicedValue = response.data.totalDicedValue;
-      remainingDiceValue = totalDicedValue;
+      setDiceRollValues(response.data.totalDicedValue, response.data.totalDicedValue);
       setGameIdAndBoardState(response.data);
 
       const divRolledDiceValues = document.getElementById('div-rolled-values');
@@ -236,6 +240,7 @@ const throwRollingSticksDice = () => {
  * @param {HTMLParagraphElement} addedNodeElement
  */
 const validateAndMoveToken = (targetNodeElement, addedNodeElement) => {
+  console.log('validateAndMoveToken');
   // Spans on the targets: either "outer-board-pos" or none on the cells
   // Cells id format: r-c-${rowIndex}-${colIndex}. row and col values are stored in innerText also
   // On the added token element hidden spans are: sp-current-pos, sp-pid, sp-tid
@@ -249,33 +254,41 @@ const validateAndMoveToken = (targetNodeElement, addedNodeElement) => {
   if (spanTokensPlayerElement === null || spanTokensIDElement === null
     || spanCurrentTokenPosElement === null)
   {
+    console.log('validation failed - null');
     return false;
   }
   axios.post('/validateMove', {
     gameId,
     currentPlayerId,
+    totalDicedValue,
+    remainingDiceValue,
     movedTokenData: {
-      tokenBelongsTo: spanTokensPlayerElement.innerText,
-      tokenId: spanTokensIDElement.innerText,
-      currentPos: spanCurrentTokenPosElement.innerText.split(','),
+      tokenBelongsTo: Number(spanTokensPlayerElement.innerText),
+      tokenId: Number(spanTokensIDElement.innerText),
+      currentPos: spanCurrentTokenPosElement.innerText.split(',').map(Number),
     },
-    sourceCellData: {
-      cellPos: spanCurrentTokenPosElement.innerText.split(','), // will be same as that of the token pos
-    },
-    targetCellData: {
-      cellPos: targetNodeElement.innerText.split(','),
-    },
+    sourceCellPos: spanCurrentTokenPosElement.innerText.split(',').map(Number), // will be same as that of the token pos
+    targetCellPos: targetNodeElement.innerText.split(',').map(Number),
   })
     .then((response) => {
       console.log(response.data);
-      return (response.data.gameStatus === 'success');
+      if (response.data.isValid && response.data.gameStatus === 'success')
+      {
+        // Successfully updated the token position in database
+        // Store the returned data into the variables
+        setGameIdAndBoardState(response.data);
+        setDiceRollValues(response.data.totalDicedValue, response.data.remainingDiceValue);
+        spanCurrentTokenPosElement.innerText = response.data.movedTokenData.currentPos.toString();
+      }
+      // Other cases of valiadtion success are crossing out others token
+      return (response.data.isValid);
     })
     .catch((error) => {
       console.log(error);
       return false;
     });
 
-  return true;
+  return false;
 };
 
 // Function that handles the dragging event
@@ -291,6 +304,7 @@ function onDragStartToken(ev) {
 // This event is fired continuously when an element or text selection
 // is being dragged and the mouse pointer is over a valid drop target
 function onDragOver(ev) {
+  console.log('onDragOver');
   ev.preventDefault();
 }
 
@@ -306,7 +320,8 @@ function onDrop(ev) {
 
   // For further validation and server communication
   // If token movement validation failed, it will not be able to drop on the target location
-  if (validateAndMoveToken(ev.target, addedNode))
+  const bValid = validateAndMoveToken(ev.target, addedNode);
+  if (bValid)
   {
     ev.preventDefault();
     ev.target.appendChild(addedNode);

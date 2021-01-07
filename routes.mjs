@@ -25,7 +25,7 @@ export default function routes(app) {
   app.post('/createGame', GamesController.handleCreateGameRequest);
   app.post('/throwDice', GamesController.handlePlayRollingDiceSticks);
   app.post('/validateMove', GamesController.handleValidateTokenMoveRequest);
-  app.post('/moveTokens', GamesController.handleMoveTokensRequest);
+  // app.post('/moveTokens', GamesController.handleMoveTokensRequest);
 
   // Tokens controller function object
   const TokensController = tokens(db);
