@@ -228,6 +228,8 @@ const throwRollingSticksDice = () => {
       const pTotalValueEl = document.createElement('p');
       pTotalValueEl.innerText = `Player: ${currentPlayerId} - Rolled Value: ${totalDicedValue}`;
       divRolledDiceValues.appendChild(pTotalValueEl);
+
+      // To do: Hightlight the target positions
     })
     .catch((err) => {
       console.log(err);
@@ -279,6 +281,13 @@ const validateAndMoveToken = (targetNodeElement, addedNodeElement) => {
         setGameIdAndBoardState(response.data);
         setDiceRollValues(response.data.totalDicedValue, response.data.remainingDiceValue);
         spanCurrentTokenPosElement.innerText = response.data.movedTokenData.currentPos.toString();
+
+        // To do: Update the token positions as per the current position returned after movement
+        // removedTokens
+        // To do:
+        // Check remainingDiceValue === 0, to find the whether step is the turn of next player.
+        // If a movement is made for this move request, remainingDiceValue = 0, if rolledValue != 4
+        // or just provide a button to mark the turn of next player in case he wants to skip that turn
       }
       // Other cases of valiadtion success are crossing out others token
       return (response.data.isValid);

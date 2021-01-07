@@ -1010,33 +1010,147 @@ export default function games(db) {
   const moveAndUpdateTokenData = async (currentGame, requestTokenData, countOfCellsToMove) => {
     try
     {
-    /**
+      /**
      * Values to be updated are
      * In requestTokenData,  remainingDiceValue, tokenCell position
      * In the game data -> tokenPositions
      */
-
       if (requestTokenData.remainingDiceValue < countOfCellsToMove)
       {
-        console.log('Remaining value to moved is less than the actual value to be moved.');
+        // This checking is done to ensure that token is not moved when
+        // it cannot find a matching position
+        console.log('Remaining value to be moved is less than the actual value to be moved.');
         return undefined;
       }
       requestTokenData.remainingDiceValue -= countOfCellsToMove;
       requestTokenData.movedTokenData.currentPos = [...requestTokenData.targetCellPos];
       const tokenPos = requestTokenData.targetCellPos.join('-');
 
+      // Check whether the target cell is a safe cell or not
+      const bIsSafeCell = isSafeCellPos(requestTokenData.targetCellPos,
+        currentGame.boardState.boardCornersAndSafePos);
+
+      let bAddNewToken = false;
+      let winnerId = null;
+      let tokenExistingIndex = -1;
+      // check for already exisiting tokens in the target cell
+      const existingTokensList = currentGame.boardState.tokenPositions[tokenPos];
+      if (undefined !== existingTokensList || existingTokensList.length === 0)
+      {
+        // Tokens are already present in it
+
+        // Check whether same token is already stored in the cell
+        tokenExistingIndex = existingTokensList.findIndex(
+          (tokenPosInfo) => (tokenPosInfo.tokenId
+            === requestTokenData.movedTokenData.tokenId),
+        );
+        // token is already present && a safe cell
+        // Count the number of tokens present in the target cell for the same player.
+        // Increment the count by 1
+        if (bIsSafeCell && (tokenExistingIndex !== -1)) {
+          currentGame.boardState.tokenPositions[tokenPos].tokenCount += 1;
+          // check for winner
+          // check whether the target cell is at the final centre position
+          if (isCentreCell(requestTokenData.targetCellPos,
+            currentGame.boardState.boardCornersAndSafePos))
+          {
+            // check how many of the same tokens are present in the central position.
+          // if all 4 are there, current player is the winner. update the database with winnerId
+            winnerId = (currentGame.boardState.tokenPositions[tokenPos].tokenCount === 4)
+              ? requestTokenData.currentPlayerId : null;
+          }
+        }
+        // Can be safe cell, but token not present. Add new token
+        else if (bIsSafeCell && (tokenExistingIndex === -1)) {
+          bAddNewToken = true;
+        }
+        // Not a safe cell, no token also
+        else if (!bIsSafeCell && (tokenExistingIndex === -1)) {
+          bAddNewToken = true;
+        }
+        else {
+          // Not safe cell. Here, remove the old tokens from the tokenPos of game data
+          // Same as adding new data
+          // Send all the removing tokens to the client after updating the current Pos to -1,-1
+          requestTokenData.removedTokens = [...existingTokensList];
+          // Update the positions
+          requestTokenData.removedTokens.forEach((tokenInfo) => {
+            tokenInfo.currentPos = [-1, -1];
+          });
+          bAddNewToken = true;
+        }
+      }
+      else {
+        // this is the first token going to be in the cell
+        bAddNewToken = true;
+      }
+      if (bAddNewToken)
+      {
+        // updated value
+        // For each pos, it will be an array of tokens.
+        // An array is kept considering the case of centre point and safe cells
+        // A cell can have same players multiple tokens
+        currentGame.boardState.tokenPositions[tokenPos] = [{
+          playerdId: requestTokenData.currentPlayerId,
+          tokenId: requestTokenData.movedTokenData.tokenId,
+          tokenCount: 1,
+        }];
+      }
+
       // Update the game table
+
       const updatedGame = await currentGame.update({
         boardState: {
           ...currentGame.boardState,
-          tokenPositions: { // updated value
-            // For each pos, it will be an array of tokens.
-            // An array is kept considering the case of centre point and safe cells
-            [tokenPos]: [{
-              playerdId: requestTokenData.currentPlayerId,
-              tokenId: requestTokenData.movedTokenData.tokenId,
-            }],
-          },
+          // // // tokenPositions: {
+          // // //   [tokenPos]: [{
+          // // //     playerdId: requestTokenData.currentPlayerId,
+          // // //     tokenId: requestTokenData.movedTokenData.tokenId,
+          // // //     tokenCount, // number of same token present in a cell
+          // // //   }],
+          // // // },
+        },
+        winnerId,
+      });
+      return updatedGame;
+    }
+    catch (error)
+    {
+      console.log(error);
+      return undefined;
+    }
+  };
+
+  // Function to remove the specified token from the source to outside the board
+  const removeTokenFromBoard = async (currentGame, requestTokenData) => {
+    try
+    {
+      const tokenPos = requestTokenData.movedTokenData.currentPos.join('-');
+      // Exisiting list of tokens at that position
+      const existingTokensList = currentGame.boardState.tokenPositions[tokenPos];
+      // Check whether same token is already stored in the cell
+      const tokenExistingIndex = existingTokensList.findIndex(
+        (tokenPosInfo) => (tokenPosInfo.tokenId
+            === requestTokenData.movedTokenData.tokenId),
+      );
+      if (tokenExistingIndex !== -1)
+      {
+        // If token has to be moved outside, remove the entry of this token from it's source cell
+        // Remove this specific item from the array
+        const removedItem = currentGame.boardState.tokenPositions[tokenPos]
+          .splice(tokenExistingIndex, 1);
+        removedItem.currentPos = [-1, -1];
+        if (undefined === requestTokenData.removedTokens)
+        {
+          requestTokenData.removedTokens = [removedItem];
+        }
+        else {
+          requestTokenData.removedTokens.push(removedItem);
+        }
+      }
+      const updatedGame = await currentGame.update({
+        boardState: {
+          ...currentGame.boardState,
         },
       });
       return updatedGame;
@@ -1058,6 +1172,7 @@ export default function games(db) {
     try
     {
       const requestData = { ...request.body };
+      requestData.removedTokens = [];
       // Get the game details
       const currentGame = await db.Game.findByPk(requestData.gameId);
       if (currentGame === null || currentGame === undefined)
@@ -1129,6 +1244,8 @@ export default function games(db) {
             totalDicedValue: requestData.totalDicedValue,
             remainingDiceValue: requestData.remainingDiceValue,
             movedTokenData: requestData.movedTokenData,
+            removedTokens: requestData.removedTokens,
+            winnerId: updatedGameData.winnerId,
           });
           return;
         }
@@ -1167,6 +1284,8 @@ export default function games(db) {
           totalDicedValue: requestData.totalDicedValue,
           remainingDiceValue: requestData.remainingDiceValue,
           movedTokenData: requestData.movedTokenData,
+          removedTokens: requestData.removedTokens,
+          winnerId: updatedGameData.winnerId,
         });
         return;
       }
@@ -1202,13 +1321,32 @@ export default function games(db) {
           totalDicedValue: requestData.totalDicedValue,
           remainingDiceValue: requestData.remainingDiceValue,
           movedTokenData: requestData.movedTokenData,
+          removedTokens: requestData.removedTokens,
+          winnerId: updatedGameData.winnerId,
         });
         return;
       }
       // 4. From inside to outside
       if (!isSrcOutsideBoard && isTargetOutsideBoard)
       {
-
+        // This movement of token is not as per the dice value
+        // If the current player is same as that of the tokens player,
+        // this movement is allowed. At this point of time, currentPlayer to tokenOwner
+        // verification is done and it will be valid
+        const updatedGameData = await removeTokenFromBoard(currentGame, requestData);
+        response.status(200).send({
+          isValid: true,
+          gameStatus: 'success',
+          msg: 'Updated the token position.',
+          gameId: updatedGameData.id,
+          currentBoardState: updatedGameData.boardState,
+          totalDicedValue: requestData.totalDicedValue,
+          remainingDiceValue: requestData.remainingDiceValue,
+          movedTokenData: requestData.movedTokenData,
+          removedTokens: requestData.removedTokens,
+          winnerId: updatedGameData.winnerId,
+        });
+        return;
       }
     }
     catch (error)
