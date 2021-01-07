@@ -3,8 +3,6 @@
  * Controller helper functions
  */
 
-import { request, response } from 'express';
-
 // Constants representing the traverse paths
 // Used while finding inner loop traversing paths
 const traversePathDirections = Object.freeze({
@@ -885,6 +883,47 @@ export default function games(db) {
     }
   };
 
+  /**
+   * Function that validates the token movement requested and if success, update the db too
+   * @param request
+   * @param response
+   */
+  const handleValidateTokenMoveRequest = (request, response) => {
+    console.log('handleValidateTokenMoveRequest');
+    // const requestData = { ...request.body };
+
+    /**
+     * gameId,
+    currentPlayerId,
+    movedTokenData: {
+      tokenBelongsTo: spanTokensPlayerElement.innerText,
+      tokenId: spanTokensIDElement.innerText,
+      currentPos: spanCurrentTokenPosElement.innerText.split(','),
+    },
+    sourceCellData: {
+      cellPos: spanCurrentTokenPosElement.innerText.split(','),
+    },
+    targetCellData: {
+      cellPos: targetNodeElement.innerText.split(','),
+    },
+     */
+
+    // if (spanCurrentTokenPosElement.innerText === '-1,-1')
+    // {
+    // // It is moved from the outer board
+    // // If target location is also outer-board, nothing to move
+    //   if (targetNodeElement.getElementsByClassName('outer-board-pos') === undefined)
+    //   {
+    //     return false;
+    //   }
+    //   // Check whether the movement is valid - only for dice values 1 & 4 it can be moved to inside
+    //   if ((totalDicedValue !== 1) && (totalDicedValue !== 4) && (remainingDiceValue === 0))
+    //   {
+    //     return false;
+    //   }
+    // }
+  };
+
   const handleMoveTokensRequest = (request, response) => {
     // 1. Read the tokens currently moved
     // 2. From Pos & ToPos
@@ -895,5 +934,10 @@ export default function games(db) {
 
   };
 
-  return { handleCreateGameRequest, handlePlayRollingDiceSticks, handleMoveTokensRequest };
+  return {
+    handleCreateGameRequest,
+    handlePlayRollingDiceSticks,
+    handleMoveTokensRequest,
+    handleValidateTokenMoveRequest,
+  };
 }

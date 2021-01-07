@@ -10,6 +10,7 @@ let currentBoardState = null; // Current State of the board
 let gameUsersTokensList = null; // Array[Mapping of gameId - PlayerId - TokenID]
 let gameId = -1; // Current game's id
 let totalDicedValue = 0; // recently played dice value
+let remainingDiceValue = totalDicedValue; // for each cell movement, this value will be dcremented
 
 const setGameIdAndBoardState = (data) => {
   gameId = data.gameId;
@@ -216,6 +217,7 @@ const throwRollingSticksDice = () => {
     .then((response) => {
       console.log(response.data);
       totalDicedValue = response.data.totalDicedValue;
+      remainingDiceValue = totalDicedValue;
       setGameIdAndBoardState(response.data);
 
       const divRolledDiceValues = document.getElementById('div-rolled-values');
@@ -226,6 +228,54 @@ const throwRollingSticksDice = () => {
     .catch((err) => {
       console.log(err);
     });
+};
+
+/**
+ * Function that validates whether the current drag and drop is valid or not.
+ * @param {HTMLDivElement} targetNodeElement
+ * @param {HTMLParagraphElement} addedNodeElement
+ */
+const validateAndMoveToken = (targetNodeElement, addedNodeElement) => {
+  // Spans on the targets: either "outer-board-pos" or none on the cells
+  // Cells id format: r-c-${rowIndex}-${colIndex}. row and col values are stored in innerText also
+  // On the added token element hidden spans are: sp-current-pos, sp-pid, sp-tid
+  // Tokens placed on outer-board will have sp-current-pos = '-1, -1'
+
+  const currentPlayerId = currentBoardState.lastPlayerId;
+  // Player Id to whom the moved token belongs:
+  const spanTokensPlayerElement = addedNodeElement.querySelector('.sp-pid');
+  const spanTokensIDElement = addedNodeElement.querySelector('.sp-tid');
+  const spanCurrentTokenPosElement = addedNodeElement.querySelector('.sp-current-pos');
+  if (spanTokensPlayerElement === null || spanTokensIDElement === null
+    || spanCurrentTokenPosElement === null)
+  {
+    return false;
+  }
+  axios.post('/validateMove', {
+    gameId,
+    currentPlayerId,
+    movedTokenData: {
+      tokenBelongsTo: spanTokensPlayerElement.innerText,
+      tokenId: spanTokensIDElement.innerText,
+      currentPos: spanCurrentTokenPosElement.innerText.split(','),
+    },
+    sourceCellData: {
+      cellPos: spanCurrentTokenPosElement.innerText.split(','), // will be same as that of the token pos
+    },
+    targetCellData: {
+      cellPos: targetNodeElement.innerText.split(','),
+    },
+  })
+    .then((response) => {
+      console.log(response.data);
+      return (response.data.gameStatus === 'success');
+    })
+    .catch((error) => {
+      console.log(error);
+      return false;
+    });
+
+  return true;
 };
 
 // Function that handles the dragging event
@@ -247,13 +297,20 @@ function onDragOver(ev) {
 // Function to handle "ondrop" event
 // This event is fired when an element or text selection is dropped on a valid drop target.
 function onDrop(ev) {
-  ev.preventDefault();
-  const data = ev.dataTransfer.getData('text');
+  // ev.preventDefault();
+  const droppedNodeId = ev.dataTransfer.getData('text');
   // const data = ev.dataTransfer.getData('application/x-moz-node');
-  console.log('onDrop: ev.target-', ev.target, 'getData-', data);
-  const addedNode = document.getElementById(data);
-  console.log('addedNode:', addedNode);
-  ev.target.appendChild(addedNode);
+  console.log('onDrop: ev.target-', ev.target, 'getData-', droppedNodeId);
+  const addedNode = document.getElementById(droppedNodeId);
+  console.log('addingNode:', addedNode);
+
+  // For further validation and server communication
+  // If token movement validation failed, it will not be able to drop on the target location
+  if (validateAndMoveToken(ev.target, addedNode))
+  {
+    ev.preventDefault();
+    ev.target.appendChild(addedNode);
+  }
 
   // Clear the drag data cache (for all formats/types)
   ev.dataTransfer.clearData();
@@ -286,6 +343,15 @@ const drawBoard = (boardSize) => {
   const divTopRow = document.createElement('div');
   divTopRow.setAttribute('id', 'top-player');
   divTopRow.classList.add('row', 'border');
+  // Add a span element idicating info to be used ondrop event
+  // handle drop events
+  const spanEl = document.createElement('span');
+  spanEl.hidden = true;
+  spanEl.classList.add('outer-board-pos', 'sp-current-pos');
+  spanEl.innerText = '-1,-1';
+  divTopRow.appendChild(spanEl);
+  divTopRow.addEventListener('drop', onDrop);
+  divTopRow.addEventListener('dragover', onDragOver);
   divOuterGameBoard.appendChild(divTopRow);
 
   const divMiddleRow = document.createElement('div');
@@ -295,12 +361,22 @@ const drawBoard = (boardSize) => {
   const divBottomRow = document.createElement('div');
   divBottomRow.setAttribute('id', 'bottom-player');
   divBottomRow.classList.add('row', 'border');
+  // Add a span element idicating info to be used ondrop event
+  // handle drop events
+  divBottomRow.appendChild(spanEl.cloneNode(true));
+  divBottomRow.addEventListener('drop', onDrop);
+  divBottomRow.addEventListener('dragover', onDragOver);
   divOuterGameBoard.appendChild(divBottomRow);
 
   // Add 3 columns to the middle row
   const divLeftCol = document.createElement('div');
   divLeftCol.classList.add('col-1');
   divLeftCol.setAttribute('id', 'left-player');
+  // Add a span element idicating info to be used ondrop event
+  // handle drop events
+  divLeftCol.appendChild(spanEl.cloneNode(true));
+  divLeftCol.addEventListener('drop', onDrop);
+  divLeftCol.addEventListener('dragover', onDragOver);
   divMiddleRow.appendChild(divLeftCol);
 
   const divMiddleCol = document.createElement('div');
@@ -310,6 +386,11 @@ const drawBoard = (boardSize) => {
   const divRightCol = document.createElement('div');
   divRightCol.classList.add('col-1');
   divRightCol.setAttribute('id', 'right-player');
+  // Add a span element idicating info to be used ondrop event
+  // handle drop events
+  divRightCol.appendChild(spanEl.cloneNode(true));
+  divRightCol.addEventListener('drop', onDrop);
+  divRightCol.addEventListener('dragover', onDragOver);
   divMiddleRow.appendChild(divRightCol);
 
   // Board of size n x n
@@ -322,7 +403,7 @@ const drawBoard = (boardSize) => {
     for (let colIndex = 0; colIndex < boardSize; colIndex += 1)
     {
       const divCol = document.createElement('div');
-      divCol.innerHTML = `<sup>(${rowIndex},${colIndex})</sup>`;
+      divCol.innerHTML = `<sup>${rowIndex},${colIndex}</sup>`;
       divCol.setAttribute('id', `r-c-${rowIndex}-${colIndex}`);
       divCol.classList.add('col', 'board-cell', 'border');
       divCol.addEventListener('drop', onDrop);
@@ -391,9 +472,6 @@ const markPlayersInitialPosition = () => {
 
       pElPlayer.classList.add('player-name');
       divEl.appendChild(pElPlayer);
-      // handle drop events
-      divEl.addEventListener('drop', onDrop);
-      divEl.addEventListener('dragover', onDragOver);
       // create the token element and append
       for (let indexToken = 0; indexToken < 4; indexToken += 1)
       {
@@ -404,20 +482,35 @@ const markPlayersInitialPosition = () => {
         // // Add the ondragstart event listener
         // tokenImgEl.addEventListener('dragstart', onDragToken);
 
-        // to do: resize css property
-        // try with img element inside a p element.
-        // check the border is only aroung the img
-
         const imageContainerEl = document.createElement('p');
         // imageContainerEl.classList.add('col');
         // imageCol.appendChild(tokenImgEl);
         imageContainerEl.style.backgroundImage = `url(${gameTokenInfo.imageFilePath})`;
         const className = 'token-image';
-        // id format: playerid-tokenid-tokenindexcounter
-        imageContainerEl.setAttribute('id', `${playerId}-${gameTokenInfo.id}-${tokenImageElementCounter}`);
+        imageContainerEl.setAttribute('id', `${className}-${tokenImageElementCounter}`);
         tokenImageElementCounter += 1;
         imageContainerEl.classList.add(className);
         imageContainerEl.draggable = true;
+        // Adding the details PlayerId, TokenId, and currentCellPos as hidden elements
+        // This will be read when the element is dropped
+        const spanPlayer = document.createElement('span');
+        imageContainerEl.appendChild(spanPlayer);
+        spanPlayer.classList.add('sp-pid');
+        spanPlayer.innerText = playerId;
+        spanPlayer.hidden = true;
+
+        const spanToken = document.createElement('span');
+        imageContainerEl.appendChild(spanToken);
+        spanToken.classList.add('sp-tid');
+        spanToken.innerText = gameTokenInfo.id;
+        spanToken.hidden = true;
+
+        const spanCurrentPos = document.createElement('span');
+        imageContainerEl.appendChild(spanCurrentPos);
+        spanCurrentPos.classList.add('sp-current-pos');
+        spanCurrentPos.innerText = '-1,-1'; // it's currently outside the game board
+        spanCurrentPos.hidden = true;
+
         imageContainerEl.addEventListener('dragstart', onDragStartToken);
         divEl.appendChild(imageContainerEl);
       }
