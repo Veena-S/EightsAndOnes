@@ -3,6 +3,8 @@
  * Controller helper functions
  */
 
+import { request, response } from 'express';
+
 // Constants representing the traverse paths
 // Used while finding inner loop traversing paths
 const traversePathDirections = Object.freeze({
@@ -883,5 +885,15 @@ export default function games(db) {
     }
   };
 
-  return { handleCreateGameRequest, handlePlayRollingDiceSticks };
+  const handleMoveTokensRequest = (request, response) => {
+    // 1. Read the tokens currently moved
+    // 2. From Pos & ToPos
+    // 3. Validate
+    //    Is toPos is allowed?
+    //    Is there any other tokens present in the toPos?
+    // 4. Update the tokenPositions
+
+  };
+
+  return { handleCreateGameRequest, handlePlayRollingDiceSticks, handleMoveTokensRequest };
 }

@@ -228,6 +228,41 @@ const throwRollingSticksDice = () => {
     });
 };
 
+// Function that handles the dragging event
+function onDragStartToken(ev) {
+  // ev.currentTarget.style.border = 'dashed';
+
+  // Add the target element's id to the data transfer object
+  // ev.dataTransfer.setData('application/x-moz-node', ev.target.id);
+  ev.dataTransfer.setData('text/plain', ev.target.id);
+
+  let data = ev.dataTransfer.getData('application/x-moz-node');
+  console.log('onDragToken:getData-', data);
+  data = ev.dataTransfer.getData('application');
+  console.log('onDragToken:getData-', data);
+
+  console.log('`onDragToken: ev.target.id-', ev.target.id, 'typeOf:', typeof (ev.target));
+}
+
+// Function to handle "ondragover" event
+function onDragOver(ev) {
+  ev.preventDefault();
+}
+
+// Function to handle "ondrop" event
+function onDrop(ev) {
+  ev.preventDefault();
+  const data = ev.dataTransfer.getData('text');
+  // const data = ev.dataTransfer.getData('application/x-moz-node');
+  console.log('onDrop: ev.target-', ev.target, 'getData-', data);
+  const addedNode = document.getElementById(data);
+  console.log('addedNode:', addedNode);
+  ev.target.appendChild(addedNode);
+
+  // Clear the drag data cache (for all formats/types)
+  ev.dataTransfer.clearData();
+}
+
 /**
  * Function that draws the board as per the size selected
  * @param {*} boardSize - board Size
@@ -294,21 +329,20 @@ const drawBoard = (boardSize) => {
       divCol.innerHTML = `<sup>(${rowIndex},${colIndex})</sup>`;
       divCol.setAttribute('id', `r-c-${rowIndex}-${colIndex}`);
       divCol.classList.add('col', 'board-cell', 'border');
+      divCol.addEventListener('drop', onDrop);
+      divCol.addEventListener('dragover', onDragOver);
+
       divRow.appendChild(divCol);
     }
   }
 };
-
-function onDragToken(ev) {
-// Add the target element's id to the data transfer object
-  ev.dataTransfer.setData('text/plain', ev.target.id);
-}
 
 /**
  * Function that marks the position of players and respective tokens in the board
  */
 const markPlayersInitialPosition = () => {
   console.log('markPlayersInitialPosition');
+  let tokenImageElementCounter = 0;
   Object.keys(currentBoardState.playersEntryPoint).forEach((playerId) => {
     console.log(playerId);
 
@@ -361,6 +395,9 @@ const markPlayersInitialPosition = () => {
 
       pElPlayer.classList.add('player-name');
       divEl.appendChild(pElPlayer);
+      // handle drop events
+      divEl.addEventListener('drop', onDrop);
+      divEl.addEventListener('dragover', onDragOver);
       // create the token element and append
       for (let indexToken = 0; indexToken < 4; indexToken += 1)
       {
@@ -379,9 +416,13 @@ const markPlayersInitialPosition = () => {
         // imageContainerEl.classList.add('col');
         // imageCol.appendChild(tokenImgEl);
         imageContainerEl.style.backgroundImage = `url(${gameTokenInfo.imageFilePath})`;
-        imageContainerEl.classList.add('token-image');
+        const className = 'token-image';
+        // id format: playerid-tokenid-tokenindexcounter
+        imageContainerEl.setAttribute('id', `${playerId}-${gameTokenInfo.id}-${tokenImageElementCounter}`);
+        tokenImageElementCounter += 1;
+        imageContainerEl.classList.add(className);
         imageContainerEl.draggable = true;
-        imageContainerEl.addEventListener('dragstart', onDragToken);
+        imageContainerEl.addEventListener('dragstart', onDragStartToken);
         divEl.appendChild(imageContainerEl);
       }
     }
