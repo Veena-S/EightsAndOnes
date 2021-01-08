@@ -11,6 +11,7 @@ let gameUsersTokensList = null; // Array[Mapping of gameId - PlayerId - TokenID]
 let gameId = -1; // Current game's id
 let totalDicedValue = 0; // recently played dice value
 let remainingDiceValue = totalDicedValue; // for each cell movement, this value will be dcremented
+const mapPlayerIdToOuterBoardPosClassName = {};
 
 const setGameIdAndBoardState = (data) => {
   gameId = data.gameId;
@@ -99,7 +100,7 @@ const createTokenSelectionList = (tokensList, playerIndex) => {
   selectElement.classList.add('game-token');
 
   // Create options
-  tokensList.forEach((singleToken, index) => {
+  tokensList.forEach((singleToken) => {
     const optionElement = document.createElement('option');
     optionElement.setAttribute('value', singleToken.id);
     // optionElement.setAttribute('value', `option-${index}`);
@@ -237,6 +238,98 @@ const throwRollingSticksDice = () => {
 };
 
 /**
+ * Function to decide next player turn
+ * @param {Object} movedTokenResponseData
+ */
+const decidePlayerTurn = (movedTokenResponseData, currentPlayerId) => {
+  // Check remainingDiceValue === 0, to find the whether next step is the turn of next player.
+  // If a movement is made for this move request, remainingDiceValue = 0
+  // or just provide a button to mark the turn of next player in case he wants to skip that turn
+};
+
+// Function to check whether the specified player is the winner or not
+const checkForGameWinner = (playerId, winnerId) => (playerId === winnerId);
+
+/** TO DO
+ * This function compares the returned game state token positions to
+ * the token placement in the board.
+ * If the there is a mimatch, the board position will be corrected
+ * Either by placing the token node to destined cell
+ * Or by updating the current position of the token present in the current cell,
+ * if the player and token id matches
+ */
+const updateTokenPositions = () => {
+
+};
+
+/**
+ * Function that validates whether the token moved out of the board
+ * is correctly placed or not.
+ * @param {*} removedTokens
+ */
+const validateRemovedTokenPositions = (removedTokens) => {
+  // First move the removed tokens node to outer board space,
+  // depending on the player who own the token
+  // get the parent node element of the token
+  removedTokens.forEach((tokenRemoved) => {
+    // Check whether this toke is still at the old location
+    const { oldPos, tokenBelongsTo } = tokenRemoved;
+    // If the token is present inside a board cell, item id = r-c-<row>-<col>
+    const divOldLocation = document.getElementsByid(`r-c-${oldPos[0]}-${oldPos[1]}`);
+    if (divOldLocation) // Found the cell element for the old location of the token
+    {
+      // Check if still there is a token at this location
+      const tokenElements = divOldLocation.querySelectorAll('.token-image');
+      tokenElements.forEach((tokenEl) => {
+        // and if there is one, is it same as the removed token.
+        const spanTokensPlayerElement = tokenEl.querySelector('.sp-pid');
+        const spanTokensIDElement = tokenEl.querySelector('.sp-tid');
+        if (!spanTokensPlayerElement && !spanTokensIDElement)
+        {
+          // Is it same as the removed token?
+          // If it is same as the removed, remove token element from the old location.
+          if (tokenRemoved.tokenId === Number(spanTokensIDElement.innerText))
+          {
+            // Token element is still present at the old location.
+            // Move it to the target location
+            // Get the target location
+            const divOuterTargetElement = document.getElementsByid(
+              mapPlayerIdToOuterBoardPosClassName[tokenBelongsTo],
+            );
+            if (divOuterTargetElement) // If the outer element is found
+            {
+              // Then check whether the same token element is present under the new location
+              // i.e. outside the board
+              const targetTokenElements = divOuterTargetElement.querySelectorAll('.token-image');
+              let bFound = false;
+              targetTokenElements.forEach((destToken) => {
+                const spanDestTokensPlayerElement = destToken.querySelector('.sp-pid');
+                const spanDestTokensIDElement = destToken.querySelector('.sp-tid');
+                if ((tokenRemoved.tokenId === Number(spanDestTokensIDElement.innerText))
+                && (tokenRemoved.tokenBelongsTo === Number(spanDestTokensPlayerElement.innerText))
+                 && !bFound)
+                {
+                  // Same as the removed element - i.e.
+                  // it is already present at the target location.
+                  // In that case just remove the token from the old location
+                  tokenEl.remove();
+                  bFound = true;
+                }
+              });
+              if (!bFound) {
+                // It is not present. Append the tokenEl to target
+                // No need to remove the earlier ones. Same object is referenced here.
+                divOuterTargetElement.appendChild(tokenEl);
+              }//
+            } // outer element is found condition ends
+          } // condition ends: removed token is still at old location
+        }
+      });
+    } // valid old location
+  });
+};
+
+/**
  * Function that validates whether the current drag and drop is valid or not.
  * @param {HTMLDivElement} targetNodeElement
  * @param {HTMLParagraphElement} addedNodeElement
@@ -281,13 +374,13 @@ const validateAndMoveToken = (targetNodeElement, addedNodeElement) => {
         setGameIdAndBoardState(response.data);
         setDiceRollValues(response.data.totalDicedValue, response.data.remainingDiceValue);
         spanCurrentTokenPosElement.innerText = response.data.movedTokenData.currentPos.toString();
-
+        validateRemovedTokenPositions(response.data.removedTokens);
         // To do: Update the token positions as per the current position returned after movement
         // removedTokens
-        // To do:
-        // Check remainingDiceValue === 0, to find the whether step is the turn of next player.
-        // If a movement is made for this move request, remainingDiceValue = 0, if rolledValue != 4
-        // or just provide a button to mark the turn of next player in case he wants to skip that turn
+        updateTokenPositions();
+        if (!checkForGameWinner(currentPlayerId, response.data.winnerId)) {
+          decidePlayerTurn(response.data, currentPlayerId);
+        }
       }
       // Other cases of valiadtion success are crossing out others token
       return (response.data.isValid);
@@ -341,8 +434,25 @@ function onDrop(ev) {
 }
 
 /**
+ * Function to add common class name for all the safe cells
+ */
+const markSafeCells = () => {
+  // A cell is represented by the id: 'r-c-${rowIndex}-${colIndex}`
+  // Apply a common class for all the entry points
+  Object.keys(currentBoardState.boardCornersAndSafePos.EntryPoints).forEach((entryPoint) => {
+    const indexRowCol = currentBoardState.boardCornersAndSafePos.EntryPoints[entryPoint];
+    const idValue = `r-c-${indexRowCol[0]}-${indexRowCol[1]}`;
+    const divSafeCellElement = document.getElementsByid(idValue);
+    if (divSafeCellElement)
+    {
+      divSafeCellElement.classList.add('safe-cell');
+    }
+  });
+};
+
+/**
  * Function that draws the board as per the size selected
- * @param {*} boardSize - board Size
+ * @param {Numeric} boardSize - board Size
  *
     -------------------------------------------
     |                   P1                    |
@@ -436,13 +546,14 @@ const drawBoard = (boardSize) => {
       divRow.appendChild(divCol);
     }
   }
+  markSafeCells();
 };
 
 /**
  * Function that marks the position of players and respective tokens in the board
  */
-const markPlayersInitialPosition = () => {
-  console.log('markPlayersInitialPosition');
+const markPlayerTokensInitialPosition = () => {
+  console.log('markPlayerTokensInitialPosition');
   let tokenImageElementCounter = 0;
   Object.keys(currentBoardState.playersEntryPoint).forEach((playerId) => {
     console.log(playerId);
@@ -492,6 +603,8 @@ const markPlayersInitialPosition = () => {
     console.log(divEl);
     if (divEl !== null || divEl !== undefined)
     {
+      mapPlayerIdToOuterBoardPosClassName[playerId] = divIdValue;
+
       console.log('Appending player name element');
 
       pElPlayer.classList.add('player-name');
@@ -550,7 +663,7 @@ const createBoard = (boardSize) => {
   drawBoard(boardSize);
 
   // Mark the players and the tokens near the respective entry positions
-  markPlayersInitialPosition();
+  markPlayerTokensInitialPosition();
 
   // Add buttons necessary for playing
   const divPlayGroupButtons = document.getElementById('div-play-group-buttons');

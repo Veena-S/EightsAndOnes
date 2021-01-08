@@ -42,7 +42,7 @@ const calculateTotalDiceValue = (rolledValues) => {
 /**
  * Function that rolls the dice sticks
  */
-const rollDiceSticks = function () {
+const rollDiceSticks = () => {
   const maxSize = 2;
   const rolledValues = [];
   for (let index = 0; index < DICE_COUNT; index += 1)
@@ -577,9 +577,8 @@ const findPathForRightCentrePoint = (boardSize, itrLoop, rightCentrePoint, pathP
  * Function to find the cells at which the loops are changed
  * @param boardSize - size of the board
  * @param boardCornersAndSafePos - Major points in the board
- * @param playersList - List of players in the game
  */
-const findTraversePaths = (boardSize, boardCornersAndSafePos, playersList) => {
+const findTraversePaths = (boardSize, boardCornersAndSafePos) => {
   // If the board size = N, there will be (N-1)/2 loops including the outer loop
   // and excluding the final position
   // ((N-1)/2) + 1) th iteration takes the token into the final position
@@ -719,18 +718,6 @@ const areCellsEqual = (firstCellPos, secondCellPos) => {
   return bEqual;
 };
 
-// /**
-//  * Function to find the cell that is located after "n" cells from the given source cell,
-//  * in the traversing path of a particular player.
-//  * @param sourceCell - cell from which the counting should start
-//  * @param cellCount - number of cells to move forward
-//  * @param currentPlayerId - current player
-//  * @param currentBoardState - current board state of the game
-//  */
-// const findCellAfterNCellsInTraversePath = (sourceCell, cellCount, currentPlayerId, currentBoardState) => {
-
-// };
-
 /**
  * Function to find the number of cells present between Source Cell and Target Cell.
  * Excludes the source cell and includes the target cell
@@ -827,7 +814,7 @@ export default function games(db) {
         // through the game course
         // traversePaths{entry1:[], entry2:[], entry3:[], entry4:[]
         // entry key format: "row-col", which holds an array of cells
-        traversePaths: findTraversePaths(boardSize, boardCornersAndSafePos, playersList),
+        traversePaths: findTraversePaths(boardSize, boardCornersAndSafePos),
         // Object that holds details of the cell in which atleast one token is present
         //  - tokens present in a cell and owner of those tokens
         // Cells that doesn't have any tokens will not be present in this object
@@ -1075,6 +1062,7 @@ export default function games(db) {
           requestTokenData.removedTokens = [...existingTokensList];
           // Update the positions
           requestTokenData.removedTokens.forEach((tokenInfo) => {
+            tokenInfo.oldPos = tokenInfo.currentPos;
             tokenInfo.currentPos = [-1, -1];
           });
           bAddNewToken = true;
@@ -1139,7 +1127,10 @@ export default function games(db) {
         // Remove this specific item from the array
         const removedItem = currentGame.boardState.tokenPositions[tokenPos]
           .splice(tokenExistingIndex, 1);
+          // Update the current position of cell in both the items
+        removedItem.oldPos = removedItem.currentPos;
         removedItem.currentPos = [-1, -1];
+        requestTokenData.movedTokenData.currentPos = [-1, -1];
         if (undefined === requestTokenData.removedTokens)
         {
           requestTokenData.removedTokens = [removedItem];
