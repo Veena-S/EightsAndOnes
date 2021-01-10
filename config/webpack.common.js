@@ -6,6 +6,9 @@ module.exports = {
   entry: {
     app: './js/src/index.js',
   },
+  // entry: {
+  //   app: ['@babel/polyfill', './js/src/index.js'],
+  // },
   plugins: [
     new MiniCssExtractPlugin(),
     new HtmlWebpackPlugin({
@@ -27,6 +30,10 @@ module.exports = {
           loader: 'babel-loader',
           options: {
             presets: ['@babel/preset-env'],
+            // presets: [[
+            //   '@babel/preset-env', {
+            //     useBuiltIns: 'entry', // To fix: Uncaught ReferenceError: regeneratorRuntime is not defined for async functions
+            //   }]],
           },
         },
       },

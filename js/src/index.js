@@ -1,4 +1,5 @@
 import axios from 'axios';
+import 'core-js';
 import { image } from 'faker';
 import './styles.scss';
 
@@ -48,6 +49,22 @@ const comparePositionArrays = (firstPosArray, secondPosArray) => {
     }
   });
   return bFound;
+};
+
+// Get all the tokens available in the game
+const getAllTokens = () => {
+// Make a request for all the tokens
+  axios.get('/tokens')
+    .then((response) => {
+      console.log(response);
+      // handle success
+      console.log(response.data);
+      gameTokensList = response.data;
+    })
+    .catch((error) => {
+    // handle error
+      console.log(error);
+    });
 };
 
 /**
@@ -245,26 +262,169 @@ const decidePlayerTurn = (movedTokenResponseData, currentPlayerId) => {
   // Check remainingDiceValue === 0, to find the whether next step is the turn of next player.
   // If a movement is made for this move request, remainingDiceValue = 0
   // or just provide a button to mark the turn of next player in case he wants to skip that turn
+  if (remainingDiceValue !== 0)
+  {
+  }
+
+  axios.post('/setNextPlayer', { gameId })
+    .then((response) => {
+
+    })
+    .catch((err) => {
+
+    });
 };
 
 // Function to check whether the specified player is the winner or not
 const checkForGameWinner = (playerId, winnerId) => (playerId === winnerId);
 
-/** TO DO
+const findGameWinner = (boardState) => {
+  let bWinnerFound = false;
+  // Check how many tokens are presnt in the centre cell of the board
+  const centreCell = boardState.boardCornersAndSafePos.FinalPos;
+  let centrePosStr = null;
+  if (Array.isArray(centreCell))
+  {
+    centrePosStr = centreCell.join('-');
+  }
+  else {
+    centrePosStr = JSON.parse(centreCell).join('-');
+  }
+  const tokensList = boardState.tokenPositions[centrePosStr];
+  if (tokensList !== undefined && tokensList.length !== 0)
+  {
+    // Check the count of each tokens present in it. If it's 4, that player is the winner
+    // "2-0":[{"playerdId":6,"tokenId":2,"tokenCount":1}],"
+    tokensList.forEach((tokenData) => {
+      if (tokenData.tokenCount === 4)
+      {
+        // This player is the winner
+        bWinnerFound = true;
+        // To Do: What to do, if there is a winner
+      }
+    });
+  }
+  return bWinnerFound;
+};
+
+// Function that compares a given entry point to the list of centre positions
+// and returns the id value of the respective outer div element
+const getOuterPosIdValues = (entryPoint, centrePositions) => {
+  const {
+    topCentrePos, leftCentrePos, rightCentrePos, bottomCentrePos,
+  } = centrePositions;
+  let divIdValue = '';
+  if (comparePositionArrays(entryPoint, topCentrePos))
+  {
+    // Place it as the top-player element
+    divIdValue = 'top-player';
+  }
+  else if (comparePositionArrays(entryPoint, leftCentrePos))
+  {
+    // left-player
+    divIdValue = 'left-player';
+  }
+  else if (comparePositionArrays(entryPoint, rightCentrePos))
+  {
+    // right-player
+    divIdValue = 'right-player';
+  }
+  else if (comparePositionArrays(entryPoint, bottomCentrePos))
+  {
+    // bottom-player
+    divIdValue = 'bottom-player';
+  }
+  return divIdValue;
+};
+
+/**
+ * Function that removes all the tokens from the inner board cells to outer board
+ * @param {*} boardState
+ */
+const moveTokensToOuterBoard = (boardState) => {
+  // Clear the tokens inside the board
+  // Get the list of tokens present in the board
+  const className = 'token-image';
+  const tokenElementsList = document.getElementsByClassName(className);
+  if (undefined === tokenElementsList)
+  {
+    return;
+  }
+  tokenElementsList.forEach((tokenEl) => {
+    const spanTokensPlayerElement = tokenEl.querySelector('.sp-pid');
+    const spanCurrentTokenPosElement = tokenEl.querySelector('.sp-current-pos');
+    if (spanTokensPlayerElement === null || spanCurrentTokenPosElement === null)
+    {
+      console.log('validation failed - null');
+      // continue;
+    }
+    const tokenBelongsTo = Number(spanTokensPlayerElement.innerText);
+    spanCurrentTokenPosElement.innerText = '-1,-1';
+    // Get the entry point for the player
+    const { entryPoint } = boardState.playersEntryPoint[tokenBelongsTo];
+    // Get the outer element for that entry point
+    const divOuterElId = getOuterPosIdValues(entryPoint,
+      boardState.boardCornersAndSafePos.EntryPoints);
+    const divOuterElement = document.getElementsByid(divOuterElId);
+    if (divOuterElement)
+    {
+      divOuterElement.appendChild(tokenEl);
+    }
+  });
+};
+
+/**
  * This function compares the returned game state token positions to
  * the token placement in the board.
- * If the there is a mimatch, the board position will be corrected
+ * If the there is a mismatch, the board position will be corrected
  * Either by placing the token node to destined cell
  * Or by updating the current position of the token present in the current cell,
  * if the player and token id matches
  */
-const updateTokenPositions = () => {
-
+const updateTokenPositions = (boardState) => {
+  // First put the tokens in the initial state
+  moveTokensToOuterBoard(boardState);
+  // Place all the tokens to inner positions
+  const updatedTokenPositions = boardState.tokenPositions;
+  if (updatedTokenPositions !== undefined)
+  {
+    Object.keys(updatedTokenPositions).forEach((cellPosition) => {
+      // Convert to pos array
+      const cellPosArray = cellPosition.split('-');
+      const tokensList = updatedTokenPositions[cellPosition];
+      tokensList.forEach((tokenInfo) => {
+        // Get the entry point for the player
+        const { entryPoint } = boardState.playersEntryPoint[tokenInfo.playerId];
+        const { tokenCount } = tokenInfo;
+        // Get the token elements at the entry position
+        const divOuterElId = getOuterPosIdValues(entryPoint,
+          boardState.boardCornersAndSafePos.EntryPoints);
+        const divOuterElement = document.getElementsByid(divOuterElId);
+        if (divOuterElement) {
+          const tokenElements = divOuterElement.querySelectorAll('.token-image');
+          tokenElements.forEach((tokenEl, index) => {
+            if (index < tokenCount)
+            {
+              const spanCurrentTokenPosElement = tokenEl.querySelector('.sp-current-pos');
+              spanCurrentTokenPosElement.innerText = cellPosArray;
+              // Append the token element to the cell
+              const divCellElement = document.getElementById(`r-c-${cellPosArray[0]}-${cellPosArray[1]}`);
+              if (divCellElement)
+              {
+                divCellElement.appendChild(tokenEl);
+              }
+            }
+          });
+        }
+      });
+    });
+  }
 };
 
 /**
  * Function that validates whether the token moved out of the board
- * is correctly placed or not.
+ * is correctly placed or not. If not, it will update the position.
+ * This comes in use, when an already exisiting token was removed by another players token
  * @param {*} removedTokens
  */
 const validateRemovedTokenPositions = (removedTokens) => {
@@ -336,61 +496,62 @@ const validateRemovedTokenPositions = (removedTokens) => {
  */
 const validateAndMoveToken = (targetNodeElement, addedNodeElement) => {
   console.log('validateAndMoveToken');
-  // Spans on the targets: either "outer-board-pos" or none on the cells
-  // Cells id format: r-c-${rowIndex}-${colIndex}. row and col values are stored in innerText also
-  // On the added token element hidden spans are: sp-current-pos, sp-pid, sp-tid
-  // Tokens placed on outer-board will have sp-current-pos = '-1, -1'
 
-  const currentPlayerId = currentBoardState.lastPlayerId;
-  // Player Id to whom the moved token belongs:
-  const spanTokensPlayerElement = addedNodeElement.querySelector('.sp-pid');
-  const spanTokensIDElement = addedNodeElement.querySelector('.sp-tid');
-  const spanCurrentTokenPosElement = addedNodeElement.querySelector('.sp-current-pos');
-  if (spanTokensPlayerElement === null || spanTokensIDElement === null
+  return new Promise((resolve, reject) => {
+  // Spans on the targets: either "outer-board-pos" or none on the cells
+    // Cells id format: r-c-${rowIndex}-${colIndex}. row and col values are stored in innerText also
+    // On the added token element hidden spans are: sp-current-pos, sp-pid, sp-tid
+    // Tokens placed on outer-board will have sp-current-pos = '-1, -1'
+
+    const currentPlayerId = currentBoardState.lastPlayerId;
+    // Player Id to whom the moved token belongs:
+    const spanTokensPlayerElement = addedNodeElement.querySelector('.sp-pid');
+    const spanTokensIDElement = addedNodeElement.querySelector('.sp-tid');
+    const spanCurrentTokenPosElement = addedNodeElement.querySelector('.sp-current-pos');
+    if (spanTokensPlayerElement === null || spanTokensIDElement === null
     || spanCurrentTokenPosElement === null)
-  {
-    console.log('validation failed - null');
-    return false;
-  }
-  axios.post('/validateMove', {
-    gameId,
-    currentPlayerId,
-    totalDicedValue,
-    remainingDiceValue,
-    movedTokenData: {
-      tokenBelongsTo: Number(spanTokensPlayerElement.innerText),
-      tokenId: Number(spanTokensIDElement.innerText),
-      currentPos: spanCurrentTokenPosElement.innerText.split(',').map(Number),
-    },
-    sourceCellPos: spanCurrentTokenPosElement.innerText.split(',').map(Number), // will be same as that of the token pos
-    targetCellPos: targetNodeElement.innerText.split(',').map(Number),
-  })
-    .then((response) => {
-      console.log(response.data);
-      if (response.data.isValid && response.data.gameStatus === 'success')
-      {
+    {
+      console.log('validation failed - null');
+      resolve(false);
+    }
+    axios.post('/validateMove', {
+      gameId,
+      currentPlayerId,
+      totalDicedValue,
+      remainingDiceValue,
+      movedTokenData: {
+        tokenBelongsTo: Number(spanTokensPlayerElement.innerText),
+        tokenId: Number(spanTokensIDElement.innerText),
+        currentPos: spanCurrentTokenPosElement.innerText.split(',').map(Number),
+      },
+      sourceCellPos: spanCurrentTokenPosElement.innerText.split(',').map(Number), // will be same as that of the token pos
+      targetCellPos: targetNodeElement.innerText.split(',').map(Number),
+    })
+      .then((response) => {
+        console.log(response.data);
+        if (response.data.isValid && response.data.gameStatus === 'success')
+        {
         // Successfully updated the token position in database
         // Store the returned data into the variables
-        setGameIdAndBoardState(response.data);
-        setDiceRollValues(response.data.totalDicedValue, response.data.remainingDiceValue);
-        spanCurrentTokenPosElement.innerText = response.data.movedTokenData.currentPos.toString();
-        validateRemovedTokenPositions(response.data.removedTokens);
-        // To do: Update the token positions as per the current position returned after movement
-        // removedTokens
-        updateTokenPositions();
-        if (!checkForGameWinner(currentPlayerId, response.data.winnerId)) {
-          decidePlayerTurn(response.data, currentPlayerId);
+          setGameIdAndBoardState(response.data);
+          setDiceRollValues(response.data.totalDicedValue, response.data.remainingDiceValue);
+          spanCurrentTokenPosElement.innerText = response.data.movedTokenData.currentPos.toString();
+          validateRemovedTokenPositions(response.data.removedTokens);
+          // To do: Update the token positions as per the current position returned after movement
+          // removedTokens
+          updateTokenPositions(response.data.currentBoardState);
+          if (!checkForGameWinner(currentPlayerId, response.data.winnerId)) {
+            decidePlayerTurn(response.data, currentPlayerId);
+          }
         }
-      }
-      // Other cases of valiadtion success are crossing out others token
-      return (response.data.isValid);
-    })
-    .catch((error) => {
-      console.log(error);
-      return false;
-    });
-
-  return false;
+        // Other cases of valiadtion success are crossing out others token
+        resolve(response.data.isValid);
+      })
+      .catch((error) => {
+        console.log(error);
+        reject(error);
+      });
+  });
 };
 
 // Function that handles the dragging event
@@ -422,12 +583,22 @@ function onDrop(ev) {
 
   // For further validation and server communication
   // If token movement validation failed, it will not be able to drop on the target location
-  const bValid = validateAndMoveToken(ev.target, addedNode);
-  if (bValid)
-  {
-    ev.preventDefault();
-    ev.target.appendChild(addedNode);
-  }
+  // const bValid = validateAndMoveToken(ev.target, addedNode);
+  // if (bValid)
+  // {
+  //   ev.preventDefault();
+  //   ev.target.appendChild(addedNode);
+  // }
+
+  validateAndMoveToken(ev.target, addedNode)
+    .then((bValid) => {
+      if (bValid)
+      {
+        ev.preventDefault();
+        ev.target.appendChild(addedNode);
+      }
+    })
+    .catch((err) => { console.log(err); });
 
   // Clear the drag data cache (for all formats/types)
   ev.dataTransfer.clearData();
@@ -442,12 +613,53 @@ const markSafeCells = () => {
   Object.keys(currentBoardState.boardCornersAndSafePos.EntryPoints).forEach((entryPoint) => {
     const indexRowCol = currentBoardState.boardCornersAndSafePos.EntryPoints[entryPoint];
     const idValue = `r-c-${indexRowCol[0]}-${indexRowCol[1]}`;
-    const divSafeCellElement = document.getElementsByid(idValue);
+    const divSafeCellElement = document.getElementById(idValue);
     if (divSafeCellElement)
     {
       divSafeCellElement.classList.add('safe-cell');
     }
   });
+};
+
+const refreshGameStatus = () => {
+  // Get the list of users and in the game
+
+  axios.post('/refreshGame', { gameId })
+    .then((response) => {
+      console.log(response.data);
+
+      setGameIdAndBoardState(response.data);
+      setDiceRollValues(response.data.totalDicedValue, response.data.remainingDiceValue);
+      // Update the token positions as per the current position returned after movement
+      // removedTokens
+      gameUsersTokensList = [...response.data.gameUsersData];
+      gameTokensList = [...response.data.completeTokensList];
+      updateTokenPositions(response.data.currentBoardState);
+      if (!findGameWinner(response.data.currentBoardState)) {
+        // decidePlayerTurn(response.data, currentPlayerId);
+      }
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+};
+
+const skipTurn = () => {
+
+  // Set the next player id and activate that player
+  // Same as calling refresh and activating next players turn
+
+};
+
+const addSkipButtons = (parentNode) => {
+  const skipButton = document.createElement('button');
+  skipButton.classList.add('btn', 'btn-sm');
+  skipButton.innerText = 'Skip Turn';
+  // const btnIconEl = document.createElement('img');
+  // btnIconEl.innerHTML = 'Skip Turn';
+  // btnIconEl.innerHTML = "<img src=>"
+  skipButton.addEventListener('click', skipTurn);
+  parentNode.appendChild(skipButton);
 };
 
 /**
@@ -486,6 +698,8 @@ const drawBoard = (boardSize) => {
   divTopRow.appendChild(spanEl);
   divTopRow.addEventListener('drop', onDrop);
   divTopRow.addEventListener('dragover', onDragOver);
+  // Add skip option button for each player
+  addSkipButtons(divTopRow);
   divOuterGameBoard.appendChild(divTopRow);
 
   const divMiddleRow = document.createElement('div');
@@ -564,9 +778,6 @@ const markPlayerTokensInitialPosition = () => {
 
     // Check for this entry point in the boardCornersAndSafePos
     // Depending on that, place the players tokens in the board
-    const {
-      topCentrePos, leftCentrePos, rightCentrePos, bottomCentrePos,
-    } = currentBoardState.boardCornersAndSafePos.EntryPoints;
     const playerEmailShort = currentBoardState.playersEntryPoint[playerId].playerEmail.split('@', 1);
     const pElPlayer = document.createElement('p');
     pElPlayer.innerText = playerEmailShort;
@@ -577,27 +788,8 @@ const markPlayerTokensInitialPosition = () => {
 
     // console.log(`gameTokenInfo:${gameTokenInfo}`);
 
-    let divIdValue = '';
-    if (comparePositionArrays(entryPoint, topCentrePos))
-    {
-      // Place it as the top-player element
-      divIdValue = 'top-player';
-    }
-    else if (comparePositionArrays(entryPoint, leftCentrePos))
-    {
-      // left-player
-      divIdValue = 'left-player';
-    }
-    else if (comparePositionArrays(entryPoint, rightCentrePos))
-    {
-      // right-player
-      divIdValue = 'right-player';
-    }
-    else if (comparePositionArrays(entryPoint, bottomCentrePos))
-    {
-      // bottom-player
-      divIdValue = 'bottom-player';
-    }
+    const divIdValue = getOuterPosIdValues(entryPoint,
+      currentBoardState.boardCornersAndSafePos.EntryPoints);
     console.log(divIdValue);
     const divEl = document.getElementById(divIdValue);
     console.log(divEl);
@@ -612,13 +804,6 @@ const markPlayerTokensInitialPosition = () => {
       // create the token element and append
       for (let indexToken = 0; indexToken < 4; indexToken += 1)
       {
-        // const tokenImgEl = document.createElement('img');
-        // tokenImgEl.setAttribute('src', gameTokenInfo.imageFilePath);
-        // tokenImgEl.classList.add('token-image');
-        // tokenImgEl.draggable = true;
-        // // Add the ondragstart event listener
-        // tokenImgEl.addEventListener('dragstart', onDragToken);
-
         const imageContainerEl = document.createElement('p');
         // imageContainerEl.classList.add('col');
         // imageCol.appendChild(tokenImgEl);
@@ -732,6 +917,14 @@ const createStartGameButton = () => {
   startgameBtn.addEventListener('click', startGame);
 };
 
+const createRefreshButton = () => {
+  const divRefreshGameBtn = document.getElementById('div-refresh-game-button');
+  const refreshGameBtn = document.createElement('button');
+  refreshGameBtn.innerText = 'Start Game';
+  divRefreshGameBtn.appendChild(refreshGameBtn);
+  refreshGameBtn.addEventListener('click', refreshGameStatus);
+};
+
 /**
  * Handler for the clicking PlayGame Button
  */
@@ -746,22 +939,9 @@ const playGame = () => {
 
   // Show the start game button
   createStartGameButton();
-};
 
-// Get all the tokens available in the game
-const getAllTokens = () => {
-// Make a request for all the tokens
-  axios.get('/tokens')
-    .then((response) => {
-      console.log(response);
-      // handle success
-      console.log(response.data);
-      gameTokensList = response.data;
-    })
-    .catch((error) => {
-    // handle error
-      console.log(error);
-    });
+  // Create Refresh Button
+  createRefreshButton();
 };
 
 /**

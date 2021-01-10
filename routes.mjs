@@ -22,6 +22,8 @@ export default function routes(app) {
   // games controller function object
   const GamesController = games(db);
   // Request handler for creating a new game
+  app.get('/refreshGame', GamesController.handleRefreshRequest);
+  app.post('/setNextPlayer', GamesController.handleSetNextPlayerRequest);
   app.post('/createGame', GamesController.handleCreateGameRequest);
   app.post('/throwDice', GamesController.handlePlayRollingDiceSticks);
   app.post('/validateMove', GamesController.handleValidateTokenMoveRequest);

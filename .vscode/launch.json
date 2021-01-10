@@ -10,7 +10,8 @@
       "request": "attach",
       "restart": true,
       "skipFiles": ["node_modules/**"],
-      "type": "pwa-node"
+      "type": "pwa-node",
+      "outFiles": ["${workspaceFolder}/bin/**/*.mjs"]
     },
 
     // {

@@ -730,19 +730,27 @@ const countCellFromSourceToTargetInPath = (sourceCell, targetCell,
   currentPlayerId, currentBoardState) => {
   // Get the traverse path corresponding to the player's entry point
   const { entryPoint } = currentBoardState.playersEntryPoint[currentPlayerId];
+  // traversePath will be an array of strings, where each item represents an array
+  // but stored as string. So, JSON parse is needed for each item
   const traversePath = currentBoardState.traversePaths[entryPoint.join('-')];
+
   // Find the index of the source and target cells in the traverse path
-  const sourceCellIndex = traversePath.findIndex(
-    (pathCell) => (areCellsEqual(sourceCell, pathCell)),
-  );
-  if (sourceCellIndex === -1)
+  let sourceCellIndex = -1;
+  // If the source cell is outside, that will not be present in the traverse path
+  if (!isPosOutsideBoard(sourceCell))
   {
-    return 0;
+    sourceCellIndex = traversePath.findIndex((pathCell) => (
+      areCellsEqual(JSON.parse(sourceCell), pathCell)
+    ));
+    if (sourceCellIndex === -1)
+    {
+      return 0;
+    }
   }
+
   // Find the index of target cell
-  const targetCellIndex = traversePath.findIndex(
-    (pathCell) => (areCellsEqual(targetCell, pathCell)),
-  );
+  const targetCellIndex = traversePath.findIndex((pathCell) => (areCellsEqual(targetCell,
+    pathCell)));
   if (targetCellIndex === -1)
   {
     return 0;
@@ -804,6 +812,9 @@ export default function games(db) {
         lastPlayerId: -1,
         // player who will throw next after earlier players token movement
         nextPlayerId: playersList[0].id,
+        // To store the moves remaining for the last player.
+        // Useful, when another player calls refresh
+        remainingDiceValue: 0,
         // to hold the corners, entry points and central positions in the board
         // boardCornersAndSafePos{ Corners, EntryPoints,FinalPos}
         boardCornersAndSafePos,
@@ -954,8 +965,6 @@ export default function games(db) {
       // It will be updated only in 2 cases: when dice is thrown or when a player is won
       const rollingData = rollDiceSticks();
       const nextPlayerId = await getNextPlayerId(gameId, currentPlayerId);
-      // const { boardState } = currentGame;
-      // await currentGame.update({ boardState });
       await currentGame.update({
         boardState: {
           boardSize: currentGame.boardState.boardSize,
@@ -1009,8 +1018,6 @@ export default function games(db) {
         console.log('Remaining value to be moved is less than the actual value to be moved.');
         return undefined;
       }
-      requestTokenData.remainingDiceValue -= countOfCellsToMove;
-      requestTokenData.movedTokenData.currentPos = [...requestTokenData.targetCellPos];
       const tokenPos = requestTokenData.targetCellPos.join('-');
 
       // Check whether the target cell is a safe cell or not
@@ -1022,7 +1029,7 @@ export default function games(db) {
       let tokenExistingIndex = -1;
       // check for already exisiting tokens in the target cell
       const existingTokensList = currentGame.boardState.tokenPositions[tokenPos];
-      if (undefined !== existingTokensList || existingTokensList.length === 0)
+      if (undefined !== existingTokensList && existingTokensList.length !== 0)
       {
         // Tokens are already present in it
 
@@ -1051,12 +1058,16 @@ export default function games(db) {
         else if (bIsSafeCell && (tokenExistingIndex === -1)) {
           bAddNewToken = true;
         }
-        // Not a safe cell, no token also
+        // Not a safe cell, also, same token is not present there
         else if (!bIsSafeCell && (tokenExistingIndex === -1)) {
           bAddNewToken = true;
+          // Remove all the other tokens that are present in the same cell,
+          // if it belongs to any other players
         }
         else {
           // Not safe cell. Here, remove the old tokens from the tokenPos of game data
+          // All the old tokens will be belonging one of the other players.
+          // Because, multiple players tokens can co-exist in a safe cell only.
           // Same as adding new data
           // Send all the removing tokens to the client after updating the current Pos to -1,-1
           requestTokenData.removedTokens = [...existingTokensList];
@@ -1065,6 +1076,7 @@ export default function games(db) {
             tokenInfo.oldPos = tokenInfo.currentPos;
             tokenInfo.currentPos = [-1, -1];
           });
+
           bAddNewToken = true;
         }
       }
@@ -1086,20 +1098,18 @@ export default function games(db) {
       }
 
       // Update the game table
+      requestTokenData.remainingDiceValue -= countOfCellsToMove;
+      currentGame.remainingDiceValue = requestTokenData.remainingDiceValue;
+      currentGame.changed('boardState', true);
+      const updatedGame = await currentGame.save();
+      requestTokenData.movedTokenData.currentPos = [...requestTokenData.targetCellPos];
 
-      const updatedGame = await currentGame.update({
-        boardState: {
-          ...currentGame.boardState,
-          // // // tokenPositions: {
-          // // //   [tokenPos]: [{
-          // // //     playerdId: requestTokenData.currentPlayerId,
-          // // //     tokenId: requestTokenData.movedTokenData.tokenId,
-          // // //     tokenCount, // number of same token present in a cell
-          // // //   }],
-          // // // },
-        },
-        winnerId,
-      });
+      if (winnerId !== null)
+      {
+        const resWinner = await updatedGame.setWinner(winnerId);
+        console.log(resWinner);
+      }
+
       return updatedGame;
     }
     catch (error)
@@ -1110,7 +1120,7 @@ export default function games(db) {
   };
 
   // Function to remove the specified token from the source to outside the board
-  const removeTokenFromBoard = async (currentGame, requestTokenData) => {
+  const removeGivenTokenFromBoard = async (currentGame, requestTokenData) => {
     try
     {
       const tokenPos = requestTokenData.movedTokenData.currentPos.join('-');
@@ -1139,11 +1149,9 @@ export default function games(db) {
           requestTokenData.removedTokens.push(removedItem);
         }
       }
-      const updatedGame = await currentGame.update({
-        boardState: {
-          ...currentGame.boardState,
-        },
-      });
+
+      currentGame.changed('boardState', true);
+      const updatedGame = await currentGame.save();
       return updatedGame;
     }
     catch (error)
@@ -1324,7 +1332,7 @@ export default function games(db) {
         // If the current player is same as that of the tokens player,
         // this movement is allowed. At this point of time, currentPlayer to tokenOwner
         // verification is done and it will be valid
-        const updatedGameData = await removeTokenFromBoard(currentGame, requestData);
+        const updatedGameData = await removeGivenTokenFromBoard(currentGame, requestData);
         response.status(200).send({
           isValid: true,
           gameStatus: 'success',
@@ -1347,10 +1355,87 @@ export default function games(db) {
     }
   };
 
+  /**
+   * Function to get the current state of the specified game
+   * @param request
+   * @param response
+   */
+  const handleRefreshRequest = async (request, response) => {
+    try {
+      const { gameId } = request.body;
+      const currentGame = await db.Game.findByPk(gameId);
+      if (currentGame === null || currentGame === undefined)
+      {
+        response.status(400).send({ gameStatus: 'error', msg: 'This game doesn\'t exists. Please Start the game' });
+      }
+      else {
+        // All the users registered for the game
+        const gameUsersData = await db.GamesUser.findAll({
+          where: { GameId: gameId },
+        });
+
+        const completeTokensList = await db.GameTokens.findAll();
+
+        const totalDicedValue = calculateTotalDiceValue(currentGame.lastDiceSet);
+        response.status(200).send({
+          gameStatus: 'success',
+          msg: 'Refreshed successfully!!',
+          gameId: currentGame.id,
+          currentBoardState: currentGame.boardState,
+          winnerId: currentGame.winnerId,
+          totalDicedValue,
+          remainingDiceValue: currentGame.remainingDiceValue,
+          gameUsersData,
+          completeTokensList,
+        });
+      }
+    }
+    catch (error)
+    {
+      console.log(error);
+      response.status(500).send({ gameStatus: 'error', msg: 'Failed to refresh the game' });
+    }
+  };
+
+  /**
+   * Function to set the next player id, when a player chooses to skip the turn
+   * @param request
+   * @param response
+   */
+  const handleSetNextPlayerRequest = async (request, response) => {
+    try {
+      const { gameId } = request.body;
+      const currentGame = await db.Game.findByPk(gameId);
+      if (currentGame === null || currentGame === undefined)
+      {
+        response.status(400).send({ gameStatus: 'error', msg: 'This game doesn\'t exists. Please Start the game' });
+        return;
+      }
+      // Game exists. Check the current player and move it to the next player
+      const nextPlayerId = await getNextPlayerId(gameId, currentGame.lastPlayerId);
+      // Update the next playerId in database
+      currentGame.nextPlayerId = nextPlayerId;
+      currentGame.remainingDiceValue = 0;
+      currentGame.changed('boardState', true);
+      const updatedGame = await currentGame.save();
+      response.status(200).status({
+        gameStatus: 'success',
+        msg: 'Next player is updated successfully',
+        currentBoardState: updatedGame.boardState,
+      });
+    }
+    catch (error)
+    {
+      console.log(error);
+      response.status(500).send({ gameStatus: 'error', msg: 'Failed to set next player' });
+    }
+  };
+
   return {
     handleCreateGameRequest,
     handlePlayRollingDiceSticks,
-    // handleMoveTokensRequest,
     handleValidateTokenMoveRequest,
+    handleRefreshRequest,
+    handleSetNextPlayerRequest,
   };
 }

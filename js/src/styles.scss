@@ -29,15 +29,20 @@ body {
 }
 
 .safe-cell {
-  position: relative;
+  // position: relative;
 }
 
-.safe-cell::after {
-  position: absolute;
-  border-top: 1px solid rgb(189, 9, 150);
-  width: 40px;
-  transform: rotate(45deg);
-  transform-origin: 0% 0%;
+// .safe-cell::after {
+//   position: absolute;
+//   border-top: 1px solid rgb(189, 9, 150);
+//   width: 40px;
+//   transform: rotate(45deg);
+//   transform-origin: 0% 0%;
+// }
+
+.board-cell {
+  width: 54px;
+  height: 54px;
 }
 
 // sup {
