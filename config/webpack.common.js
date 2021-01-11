@@ -30,10 +30,6 @@ module.exports = {
           loader: 'babel-loader',
           options: {
             presets: ['@babel/preset-env'],
-            // presets: [[
-            //   '@babel/preset-env', {
-            //     useBuiltIns: 'entry', // To fix: Uncaught ReferenceError: regeneratorRuntime is not defined for async functions
-            //   }]],
           },
         },
       },
@@ -45,6 +41,17 @@ module.exports = {
             loader: 'css-loader',
           },
           'sass-loader',
+        ],
+      },
+      {
+        test: /\.(png|jpe?g|gif)$/i,
+        use: [
+          {
+            loader: 'file-loader',
+            options: {
+              publicPath: './',
+            },
+          },
         ],
       },
     ],

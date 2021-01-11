@@ -107,25 +107,26 @@ const findBoardCornersAndEntryPositions = (boardSize) => {
   const topRightPos = [0, boardSize - 1];
 
   const leftCentrePos = [(boardSize - 1) / 2, 0]; // Entry point
-  const centrePos = [(boardSize - 1) / 2, (boardSize - 1) / 2]; // Final Position
-  const rightCentrePos = [(boardSize - 1) / 2, (boardSize - 1)]; // Entry point
 
   const bottomLeftPos = [(boardSize - 1), 0];
   const bottomCentrePos = [(boardSize - 1), (boardSize - 1) / 2]; // Entry Point
   const bottomRightPos = [(boardSize - 1), (boardSize - 1)];
 
+  const centrePos = [(boardSize - 1) / 2, (boardSize - 1) / 2]; // Final Position
+  const rightCentrePos = [(boardSize - 1) / 2, (boardSize - 1)]; // Entry point
+
   return {
     Corners: {
       topLeftPos,
-      topRightPos,
       bottomLeftPos,
       bottomRightPos,
+      topRightPos,
     },
-    EntryPoints: {
+    EntryPoints: { // Stored in anti-clockwise order
       topCentrePos,
       leftCentrePos,
-      rightCentrePos,
       bottomCentrePos,
+      rightCentrePos,
     },
     FinalPos: centrePos,
   };
@@ -739,9 +740,10 @@ const countCellFromSourceToTargetInPath = (sourceCell, targetCell,
   // If the source cell is outside, that will not be present in the traverse path
   if (!isPosOutsideBoard(sourceCell))
   {
-    sourceCellIndex = traversePath.findIndex((pathCell) => (
-      areCellsEqual(JSON.parse(sourceCell), pathCell)
-    ));
+    sourceCellIndex = traversePath.findIndex((pathCell) => {
+      const pathCellArr = (typeof (pathCell) === 'string') ? JSON.parse(pathCell) : pathCell;
+      return areCellsEqual(sourceCell, pathCellArr);
+    });
     if (sourceCellIndex === -1)
     {
       return 0;
@@ -749,8 +751,10 @@ const countCellFromSourceToTargetInPath = (sourceCell, targetCell,
   }
 
   // Find the index of target cell
-  const targetCellIndex = traversePath.findIndex((pathCell) => (areCellsEqual(targetCell,
-    pathCell)));
+  const targetCellIndex = traversePath.findIndex((pathCell) => {
+    const pathCellArr = (typeof (pathCell) === 'string') ? JSON.parse(pathCell) : pathCell;
+    return (areCellsEqual(targetCell, pathCellArr));
+  });
   if (targetCellIndex === -1)
   {
     return 0;
@@ -797,6 +801,8 @@ export default function games(db) {
     const playersEntryPoint = mapPlayerToEntryPoints(playerTokenArray, playersList,
       boardCornersAndSafePos.EntryPoints);
 
+    const remainingDiceValue = 0;
+
     /*
       Create a new Game entry
       At the start of the game, no player tokens will be present inside the board
@@ -814,7 +820,7 @@ export default function games(db) {
         nextPlayerId: playersList[0].id,
         // To store the moves remaining for the last player.
         // Useful, when another player calls refresh
-        remainingDiceValue: 0,
+        remainingDiceValue,
         // to hold the corners, entry points and central positions in the board
         // boardCornersAndSafePos{ Corners, EntryPoints,FinalPos}
         boardCornersAndSafePos,
@@ -971,6 +977,7 @@ export default function games(db) {
           lastDiceSet: rollingData.rolledValues, // updated value
           lastPlayerId: currentPlayerId, // updated Value
           nextPlayerId, // updated value
+          remainingDiceValue: rollingData.totalDicedValue, // updated Value
           boardCornersAndSafePos: currentGame.boardState.boardCornersAndSafePos,
           playersEntryPoint: currentGame.boardState.playersEntryPoint,
           traversePaths: currentGame.boardState.traversePaths,
@@ -1042,7 +1049,7 @@ export default function games(db) {
         // Count the number of tokens present in the target cell for the same player.
         // Increment the count by 1
         if (bIsSafeCell && (tokenExistingIndex !== -1)) {
-          currentGame.boardState.tokenPositions[tokenPos].tokenCount += 1;
+          existingTokensList[tokenExistingIndex].tokenCount += 1;
           // check for winner
           // check whether the target cell is at the final centre position
           if (isCentreCell(requestTokenData.targetCellPos,
@@ -1050,7 +1057,7 @@ export default function games(db) {
           {
             // check how many of the same tokens are present in the central position.
           // if all 4 are there, current player is the winner. update the database with winnerId
-            winnerId = (currentGame.boardState.tokenPositions[tokenPos].tokenCount === 4)
+            winnerId = (existingTokensList[tokenExistingIndex].tokenCount === 4)
               ? requestTokenData.currentPlayerId : null;
           }
         }
@@ -1076,20 +1083,29 @@ export default function games(db) {
             tokenInfo.oldPos = tokenInfo.currentPos;
             tokenInfo.currentPos = [-1, -1];
           });
-
           bAddNewToken = true;
+          // Removing from db data too
+          currentGame.boardState.tokenPositions[tokenPos] = [];
+        }
+        if (bAddNewToken)
+        {
+          // updated value
+          // For each pos, it will be an array of tokens.
+          // An array is kept considering the case of centre point and safe cells
+          // A cell can have same players multiple tokens
+
+          // This is a new token, but there might be other tokens as well in this cell
+          // And the array is already existing for this token position
+          currentGame.boardState.tokenPositions[tokenPos].push({
+            playerdId: requestTokenData.currentPlayerId,
+            tokenId: requestTokenData.movedTokenData.tokenId,
+            tokenCount: 1,
+          });
         }
       }
       else {
         // this is the first token going to be in the cell
         bAddNewToken = true;
-      }
-      if (bAddNewToken)
-      {
-        // updated value
-        // For each pos, it will be an array of tokens.
-        // An array is kept considering the case of centre point and safe cells
-        // A cell can have same players multiple tokens
         currentGame.boardState.tokenPositions[tokenPos] = [{
           playerdId: requestTokenData.currentPlayerId,
           tokenId: requestTokenData.movedTokenData.tokenId,
@@ -1099,7 +1115,7 @@ export default function games(db) {
 
       // Update the game table
       requestTokenData.remainingDiceValue -= countOfCellsToMove;
-      currentGame.remainingDiceValue = requestTokenData.remainingDiceValue;
+      currentGame.boardState.remainingDiceValue = requestTokenData.remainingDiceValue;
       currentGame.changed('boardState', true);
       const updatedGame = await currentGame.save();
       requestTokenData.movedTokenData.currentPos = [...requestTokenData.targetCellPos];
@@ -1250,11 +1266,14 @@ export default function games(db) {
         }
         // if (requestData.totalDicedValue === 4)
         // Is this as part of a new roll dice or continuation of a previous throw?
-        // const isFirstMovementAfterRoll = (requestData.totalDicedValue
-        //                                 === requestData.remainingDiceValue);
         // Mainly applicable for value = 4
         // Player can choose any value between 1 and 4, both values including
-        // Validate the specified target cell comes under the remainingDiceValue
+        // Roll Value == 4 ==> a token can split the value in the following ways, if the token
+        // is being moved from outside to inside:
+        //  1. 1 move to enter into the board + 3 cells forward for the same token
+        //  2. All 4 tokens can enter the board
+        //  3. To Do: Value 4 can be splitted into any combination
+        // Validate the specified target cell comes under or equal to the remainingDiceValue
         const numOfCellsToTarget = countCellFromSourceToTargetInPath(requestData.sourceCellPos,
           requestData.targetCellPos, requestData.currentPlayerId, currentGame.boardState);
         if ((numOfCellsToTarget === 0) || (numOfCellsToTarget > requestData.remainingDiceValue))
@@ -1415,7 +1434,7 @@ export default function games(db) {
       const nextPlayerId = await getNextPlayerId(gameId, currentGame.lastPlayerId);
       // Update the next playerId in database
       currentGame.nextPlayerId = nextPlayerId;
-      currentGame.remainingDiceValue = 0;
+      currentGame.boardState.remainingDiceValue = 0;
       currentGame.changed('boardState', true);
       const updatedGame = await currentGame.save();
       response.status(200).status({

@@ -14,6 +14,7 @@ app.use(express.urlencoded({ extended: false }));
 
 app.use(express.static('public'));
 app.use(express.static('public/tokenImages'));
+app.use(express.static('public/misc-Images'));
 
 app.use(methodOverride('_method'));
 

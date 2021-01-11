@@ -1,6 +1,7 @@
 import axios from 'axios';
 import 'core-js';
 import { image } from 'faker';
+import './gameRules.js';
 import './styles.scss';
 
 const PLAYER_COUNT_COMBO_ID = 'player-count';
@@ -13,6 +14,7 @@ let gameId = -1; // Current game's id
 let totalDicedValue = 0; // recently played dice value
 let remainingDiceValue = totalDicedValue; // for each cell movement, this value will be dcremented
 const mapPlayerIdToOuterBoardPosClassName = {};
+let winnerId = -1;
 
 const setGameIdAndBoardState = (data) => {
   gameId = data.gameId;
@@ -235,17 +237,27 @@ const createBoardSelectCombo = () => {
  * Function that handles dice throw
  */
 const throwRollingSticksDice = () => {
+  if (remainingDiceValue !== 0)
+  {
+    // To DO: Instead of alert message, do a proper checking for the possibilities of
+    // further movement
+    // eslint-disable-next-line no-alert
+    alert('Current Player\'s movement not finished.\nEither complete the move or skip the turn');
+    return;
+  }
   const currentPlayerId = currentBoardState.nextPlayerId;
   axios.post('/throwDice', { gameId, currentPlayerId })
     .then((response) => {
       console.log(response.data);
-      setDiceRollValues(response.data.totalDicedValue, response.data.totalDicedValue);
+      setDiceRollValues(response.data.totalDicedValue,
+        response.data.currentBoardState.remainingDiceValue);
       setGameIdAndBoardState(response.data);
 
-      const divRolledDiceValues = document.getElementById('div-rolled-values');
-      const pTotalValueEl = document.createElement('p');
-      pTotalValueEl.innerText = `Player: ${currentPlayerId} - Rolled Value: ${totalDicedValue}`;
-      divRolledDiceValues.appendChild(pTotalValueEl);
+      const itemTotalValueEl = document.createElement('li');
+      const textValue = document.createTextNode(`Player: ${currentPlayerId} - Rolled Value: ${totalDicedValue}`);
+      itemTotalValueEl.appendChild(textValue);
+      const rolledValuesListEl = document.getElementById('rolled-dice');
+      rolledValuesListEl.insertBefore(itemTotalValueEl, rolledValuesListEl.childNodes[0]);
 
       // To do: Hightlight the target positions
     })
@@ -254,29 +266,45 @@ const throwRollingSticksDice = () => {
     });
 };
 
+// To DO:
+// /**
+//  * Function to decide next player turn
+//  * @param {Object} movedTokenResponseData
+//  */
+// const decidePlayerTurn = (movedTokenResponseData, currentPlayerId) => {
+//   // Check remainingDiceValue === 0, to find the whether next step is the turn of next player.
+//   // If a movement is made for this move request, remainingDiceValue = 0
+//   // or just provide a button to mark the turn of next player in case he wants to skip that turn
+//   if (remainingDiceValue !== 0)
+//   {
+//   }
+//
+//   axios.post('/setNextPlayer', { gameId })
+//     .then((response) => {
+//
+//     })
+//     .catch((err) => {
+//
+//     });
+// };
+
 /**
- * Function to decide next player turn
- * @param {Object} movedTokenResponseData
+ * Function to check whether the specified player is the winner or not
+ * @param {*} playerId
+ * @param {*} winnerId
  */
-const decidePlayerTurn = (movedTokenResponseData, currentPlayerId) => {
-  // Check remainingDiceValue === 0, to find the whether next step is the turn of next player.
-  // If a movement is made for this move request, remainingDiceValue = 0
-  // or just provide a button to mark the turn of next player in case he wants to skip that turn
-  if (remainingDiceValue !== 0)
-  {
-  }
+const checkForGameWinner = (playerId, returnedWinnerId) => (playerId === returnedWinnerId);
 
-  axios.post('/setNextPlayer', { gameId })
-    .then((response) => {
-
-    })
-    .catch((err) => {
-
-    });
+const declareWinner = (returnedWinnerId) => {
+// Provide an alert
+// Disable all other buttons, except start game
+// get the player name
+  // eslint-disable-next-line no-alert
+  alert(`Game completed. Winner is: 
+  ${currentBoardState.playersEntryPoint[returnedWinnerId].playerEmail.split('@', 1)}`);
+  const btnThrow = document.getElementById('btn-throw-dice');
+  btnThrow.disabled = true;
 };
-
-// Function to check whether the specified player is the winner or not
-const checkForGameWinner = (playerId, winnerId) => (playerId === winnerId);
 
 const findGameWinner = (boardState) => {
   let bWinnerFound = false;
@@ -300,7 +328,7 @@ const findGameWinner = (boardState) => {
       {
         // This player is the winner
         bWinnerFound = true;
-        // To Do: What to do, if there is a winner
+        winnerId = tokenData.playerdId;
       }
     });
   }
@@ -537,12 +565,12 @@ const validateAndMoveToken = (targetNodeElement, addedNodeElement) => {
           setDiceRollValues(response.data.totalDicedValue, response.data.remainingDiceValue);
           spanCurrentTokenPosElement.innerText = response.data.movedTokenData.currentPos.toString();
           validateRemovedTokenPositions(response.data.removedTokens);
-          // To do: Update the token positions as per the current position returned after movement
-          // removedTokens
-          updateTokenPositions(response.data.currentBoardState);
-          if (!checkForGameWinner(currentPlayerId, response.data.winnerId)) {
-            decidePlayerTurn(response.data, currentPlayerId);
-          }
+          winnerId = response.data.winnerId;
+          // updateTokenPositions(response.data.currentBoardState);
+          // if (!checkForGameWinner(currentPlayerId, response.data.winnerId)) {
+          //   // To do:
+          //   // decidePlayerTurn(response.data, currentPlayerId);
+          // }
         }
         // Other cases of valiadtion success are crossing out others token
         resolve(response.data.isValid);
@@ -596,6 +624,11 @@ function onDrop(ev) {
       {
         ev.preventDefault();
         ev.target.appendChild(addedNode);
+        if (checkForGameWinner(currentBoardState.lastPlayerId, winnerId)) {
+          // To do:
+          // decidePlayerTurn(response.data, currentPlayerId);
+          declareWinner(winnerId);
+        }
       }
     })
     .catch((err) => { console.log(err); });
@@ -624,7 +657,7 @@ const markSafeCells = () => {
 const refreshGameStatus = () => {
   // Get the list of users and in the game
 
-  axios.post('/refreshGame', { gameId })
+  axios.get('/refreshGame', { gameId })
     .then((response) => {
       console.log(response.data);
 
@@ -635,8 +668,9 @@ const refreshGameStatus = () => {
       gameUsersTokensList = [...response.data.gameUsersData];
       gameTokensList = [...response.data.completeTokensList];
       updateTokenPositions(response.data.currentBoardState);
-      if (!findGameWinner(response.data.currentBoardState)) {
+      if (findGameWinner(response.data.currentBoardState)) {
         // decidePlayerTurn(response.data, currentPlayerId);
+        declareWinner(response.data.winnerId);
       }
     })
     .catch((err) => {
@@ -645,13 +679,21 @@ const refreshGameStatus = () => {
 };
 
 const skipTurn = () => {
-
   // Set the next player id and activate that player
   // Same as calling refresh and activating next players turn
+  axios.get('/setNextPlayer', { gameId })
+    .then((response) => {
+      console.log(response.data);
 
+      setGameIdAndBoardState(response.data);
+      setDiceRollValues(response.data.totalDicedValue, response.data.remainingDiceValue);
+    })
+    .catch((err) => {
+      console.log(err);
+    });
 };
 
-const addSkipButtons = (parentNode) => {
+const addSkipButton = (parentNode) => {
   const skipButton = document.createElement('button');
   skipButton.classList.add('btn', 'btn-sm');
   skipButton.innerText = 'Skip Turn';
@@ -698,8 +740,6 @@ const drawBoard = (boardSize) => {
   divTopRow.appendChild(spanEl);
   divTopRow.addEventListener('drop', onDrop);
   divTopRow.addEventListener('dragover', onDragOver);
-  // Add skip option button for each player
-  addSkipButtons(divTopRow);
   divOuterGameBoard.appendChild(divTopRow);
 
   const divMiddleRow = document.createElement('div');
@@ -857,6 +897,8 @@ const createBoard = (boardSize) => {
   btnThrowDice.innerText = 'Roll Stick Dice';
   btnThrowDice.addEventListener('click', throwRollingSticksDice);
   divPlayGroupButtons.appendChild(btnThrowDice);
+
+  addSkipButton(divPlayGroupButtons);
 };
 
 /**
@@ -920,7 +962,7 @@ const createStartGameButton = () => {
 const createRefreshButton = () => {
   const divRefreshGameBtn = document.getElementById('div-refresh-game-button');
   const refreshGameBtn = document.createElement('button');
-  refreshGameBtn.innerText = 'Start Game';
+  refreshGameBtn.innerText = 'Refresh Game';
   divRefreshGameBtn.appendChild(refreshGameBtn);
   refreshGameBtn.addEventListener('click', refreshGameStatus);
 };
@@ -944,10 +986,58 @@ const playGame = () => {
   createRefreshButton();
 };
 
+const requestLogin = () => {
+  const data = {
+    email: document.getElementById('email').value,
+    password: document.getElementById('password').value,
+  };
+  console.log(data);
+  axios.post('/login', data)
+    .then((responseData) => {
+      console.log(responseData);
+      const isUserLoggedIn = responseData.data.success;
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+};
+
+const requestSignup = () => {
+  const data = {
+    email: document.getElementById('email').value,
+    password: document.getElementById('password').value,
+  };
+  console.log(data);
+
+  axios.post('/sign-up', data)
+    .then((responseData) => {
+      console.log(responseData);
+      const isUserLoggedIn = responseData.data.success;
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+};
+
+const doLoginAsGuest = () => {
+  const loginEl = document.getElementById('login-form');
+  loginEl.hidden = true;
+  const startEl = document.getElementById('start');
+  startEl.hidden = false;
+};
+
 /**
  * Starting point
  */
 function main() {
+  const startEl = document.getElementById('start');
+  startEl.hidden = true;
+  const btnLogin = document.getElementById('submit-login');
+  btnLogin.addEventListener('click', requestLogin);
+  const btnSignup = document.getElementById('submit-signup');
+  btnSignup.addEventListener('click', requestSignup);
+  const btnGuest = document.getElementById('as-guest');
+  btnGuest.addEventListener('click', doLoginAsGuest);
   const btnPlayGame = document.getElementById('btn-play-game');
   btnPlayGame.addEventListener('click', playGame);
 }

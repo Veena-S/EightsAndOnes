@@ -1,5 +1,76 @@
 body {
-  background-color: pink;
+  background-color: #ef8d68;
+  // background-image: url("./bg-images/bg-body.jpg");
+  background-image: url("./bg-images/bor-blocks.png");
+}
+
+.homepage {
+  margin-top: 5%;
+  margin-left: 15%;
+  margin-right: 15%;
+  padding: 0 10% 0 10%;
+}
+
+.container {
+  background-color: white;
+  border: solid #b13405;
+  border-radius: 0.5rem;
+}
+
+.form-row {
+  margin: 10% 10% 0 10%;
+}
+
+.input-group {
+  border: solid 0.5px #b13405;
+  border-radius: 0.2rem;
+}
+
+.input-group-text {
+  background-color: darkorange;
+}
+
+.cust-input {
+  border-left: solid 0.5px #b13405;
+}
+
+.cust-buttons {
+  background-color: orangered;
+  color: white;
+  border-color: white;
+  border-radius: 0.2em;
+}
+
+.guest a {
+  // color: inherit;
+  color: orangered;
+  border: solid 1px orangered;
+  margin: 10px 0 10px 0;
+}
+
+.game-rules {
+  color: #842029;
+  background-color: #f3e4b8;
+  margin-top: 5%;
+  margin-left: 10%;
+  margin-right: 10%;
+  padding: 0 0% 0 7%;
+  line-height: 1.5rem;
+  font-weight: 500;
+}
+
+.divider {
+  background-image: url("./bg-images/divider-1.png");
+}
+
+.divider::before {
+  content: "";
+  position: relative;
+  height: 0.1rem;
+  flex: 1;
+  left: auto;
+  right: auto;
+  bottom: auto;
 }
 
 .game-token {
