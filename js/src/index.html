@@ -52,7 +52,7 @@
       <!--Login page is made as home page-->
       <div class="container" id="login-form">
         <div class="row">
-          <h4 class="h4 text-center mt-4">Eight & One</h4>
+          <h2 class="text-center mt-4 game-header">Eights & Ones</h4>
         </div>
         <!-- <form action="/login" method="POST" id="login-details"> -->
         <div class="form-row" id="login-details">
@@ -99,33 +99,132 @@
               Sign-up
             </button>
           </div>
+          <div class="col-sm-4 guest ">
+          <button id="as-guest" class="btn btn-sm cust-buttons">Enter as a Guest</button>
+        </div>
         </div>
         <!-- </form> -->
-        <div class="row guest">
-          <a
-            href="/"
-            role="button"
-            id="as-guest"
-            class="btn text-decoration-none border"
-            >Enter as a Guest</a
-          >
-        </div>
       </div>
     </div>
 
-    <div class="start">
-      <button id="btn-play-game">Play Game</button>
-      <div id="div-combo-board-size"></div>
-      <div id="div-combo-player-count"></div>
-      <div id="div-start-game-button"></div>
-      <div id="div-refresh-game-button"></div>
-      <div id="div-playing-board">
-        <div id="div-outer-game-board"></div>
+    <div class="container" id="start">
+      <div class="game-story game-description" id="game-details">
+        <h3 class="game-title">Eights & Ones</h3>
+        <div class="contents">
+          <div class="compact-description">
+            <p class="game-description">
+              Eights & Ones is a two- or four-player board game from India. This game
+              is similar to <em>Chowka Bara</em> or <em>Ashta Chamma</em>, with variations.<br>This
+              game is an example of a “fully observable” system that has an
+              element of chance introduced by the roll of special dice and an
+              element of strategy (the strategy being the pawn the player
+              decides to move after the roll of the dice).
+            </p>
+            <div class="see-more-block">
+              <button class="btn btn-sm cust-buttons" type="button" data-bs-toggle="collapse" data-bs-target="#full-description" aria-expanded="false" aria-controls="full-description">Read More...</button>
+            </div>
+          </div>
+          <div class="collapse" id="full-description">
+            <p class="game-description">
+              Eights & Ones normally has 5x5 square board and four players. But
+              the number of squares can be increased to any size NxN, where N is
+              an odd number. Each player will have 4 pawns or game tokens. Goal
+              of a player in the game is to bring all the 4 pawns into the
+              centre cell.
+              <br>
+              <img
+                src="gameboard.png"
+                class="img-fluid img-rounded cust-border mt-3"
+                alt="Game Board" 
+              />
+            </p>
+          </div>
+        </div>
+        <div class="game-rules game-description">
+          <button class="btn btn-sm cust-buttons" type="button" data-bs-toggle="collapse" data-bs-target="#rules-list" aria-expanded="false" aria-controls="rules-list">Game Rules</button>
+          <div id="rules-list" class="collapse">
+            <h4 class="game-title">Game Rules</h4>
+          <ol  >
+            <li>
+              A player can enter the game board through the home cell only if he
+              manages to get point = 1 or point = 4
+              <li>If a player gets 4, he can either:</li>
+                <ul>
+                  <li>
+                    choose to enter all the 4 tokens into the home cell or
+                  </li>
+                  <li>
+                    choose to start with only one token and move 3 cells forward
+                  </li>
+                </ul>
+                <li>Only at this point 4 can be split.</li>
+                <li>
+                  At any other point of game, this splitting is not allowed.
+                </li>
+            </li>
+            <li>
+              Once entered into the board, each player can throw the 4 dices
+              when their turn comes
+            </li>
+            <li>
+              Can move any of the tokens inside the board, to a cell by the
+              number of points received.
+            </li>
+            <li>A cell can store multiple tokens of the same player.</li>
+            <li>
+              If a token comes to set in a cell where another player’s token is
+              already present, old ones will be cut out by the current players
+              token
+            </li>
+            <li>
+              Rest/Safe locations
+              <ul>
+                <li>
+                  Each player has a home cell, which serves as the entry point
+                  to the game for that player, making 4 entry points alias safe
+                  cells
+                </li>
+                <li>
+                  All these 4 entry points are safe points for the all the
+                  players i.e. tokens of different players can be stored in the
+                  safe cells
+                </li>
+              </ul>
+            </li>
+            <li>
+              Goal - A player has to make all the 4 tokens to reach the centre
+              cell, which is the final destination
+            </li>
+            <li>
+              Winner - First player who manages to bring all the 4 tokens at the
+              final point
+            </li>
+          </ol>
+          </div>
+        </div>
+        <div>
+          <button id="btn-play-game" class="btn btn-sm cust-buttons">Play Game</button>
+        </div>
       </div>
-
-      <div id="div-play-group-buttons"></div>
-      <div id="div-rolled-values">
-        <ol id="rolled-dice"></ol>
+      <div class="game-play container">
+        <!--settings-->
+        <div class="row" id="settings">
+          <h6></h6>
+          <div class="col-sm-3" id="div-combo-board-size"></div>
+          <div class="col-sm-3" id="div-combo-player-count"></div>
+          <div class="col-sm-3" id="div-start-game-button"></div>
+          <div class="col-sm-3" id="div-refresh-game-button"></div>
+        </div>
+        <div id="div-play-group-buttons"  class="mt-4"></div>
+        <div id="div-rolled-values-recent" class="cust-border cust-margin">
+          <p id="rolled-values-recent"></p>
+        </div>
+        <div id="div-playing-board" class="mt-4">
+          <div id="div-outer-game-board"></div>
+        </div>
+        <div id="div-rolled-values" class="cust-border">
+          <ol id="rolled-dice"></ol>
+        </div>
       </div>
     </div>
   </body>

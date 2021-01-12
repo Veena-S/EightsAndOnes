@@ -1329,7 +1329,7 @@ export default function games(db) {
         // The target position specified is correct.
         // Move the token to the target cell and update db
         const updatedGameData = await moveAndUpdateTokenData(currentGame,
-          requestData, requestData.totalDicedValue);
+          requestData, requestData.remainingDiceValue);
         response.status(200).send({
           isValid: true,
           gameStatus: 'success',

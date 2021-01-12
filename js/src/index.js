@@ -6,6 +6,7 @@ import './styles.scss';
 
 const PLAYER_COUNT_COMBO_ID = 'player-count';
 const BOARD_SIZE_COMBO_ID = 'board-size';
+const CUST_BUTTON_CLASS = 'cust-buttons';
 let gameTokensList = null;
 let playersList = null; // id, email
 let currentBoardState = null; // Current State of the board
@@ -15,6 +16,9 @@ let totalDicedValue = 0; // recently played dice value
 let remainingDiceValue = totalDicedValue; // for each cell movement, this value will be dcremented
 const mapPlayerIdToOuterBoardPosClassName = {};
 let winnerId = -1;
+
+const startEl = document.getElementById('start');
+startEl.style.display = 'none';
 
 const setGameIdAndBoardState = (data) => {
   gameId = data.gameId;
@@ -51,6 +55,58 @@ const comparePositionArrays = (firstPosArray, secondPosArray) => {
     }
   });
   return bFound;
+};
+
+/**
+ * Function to highlight the path of a player after he throw the dice
+ * @param {*} currentBoardState
+ * @param {*} currentPlayerId
+ */
+const hightlightTraversePath = (boardState, currentPlayerId) => {
+  const { entryPoint } = boardState.playersEntryPoint[currentPlayerId];
+  let entry = '';
+  if (Array.isArray(entryPoint))
+  {
+    entry = entryPoint.join('-');
+  }
+  else {
+    entry = JSON.parse(entryPoint).join('-');
+  }
+
+  const traversePathArray = boardState.traversePaths[entry];
+  traversePathArray.forEach((cellPos, index) => {
+    // To Do
+    // Check the entry position
+    // Loop: Get the cells till the next corner
+    // Add respective Arrow for the cell
+
+    const pathCellArr = (typeof (cellPos) === 'string') ? JSON.parse(cellPos) : cellPos;
+
+    // As of now, instead of Arrows, it's highlighted by dots
+    // Get the element at the cell pos
+    const divCellEl = document.getElementById(`r-c-${pathCellArr[0]}-${pathCellArr[1]}`);
+    if (divCellEl)
+    {
+      if (index === (traversePathArray.length - 2))
+      {
+      // Add diamond at the last cell
+        divCellEl.innerHTML += '<i class="diamond highlighted"></i>';
+      }
+      else {
+        divCellEl.innerHTML += '<i class="dot highlighted"></i>';
+      }
+    }
+  });
+};
+
+// Simply remove the hightlighed class elements from the board
+// Called before each throw or when the dice is placed completly
+const deleteHighlights = () => {
+  const divHighlightedEls = document.getElementsByClassName('highlighted');
+  if (divHighlightedEls)
+  {
+    divHighlightedEls.forEach((singleEl) => { singleEl.remove(); });
+  }
 };
 
 // Get all the tokens available in the game
@@ -241,10 +297,16 @@ const throwRollingSticksDice = () => {
   {
     // To DO: Instead of alert message, do a proper checking for the possibilities of
     // further movement
-    // eslint-disable-next-line no-alert
-    alert('Current Player\'s movement not finished.\nEither complete the move or skip the turn');
-    return;
+    // // eslint-disable-next-line no-alert
+    // alert('Current Player\'s movement not finished.\nEither complete the move or skip the turn');
+    // return;
   }
+  deleteHighlights();
+  const rollValueEl = document.getElementById('div-rolled-values');
+  rollValueEl.style.display = 'block';
+  const divRecentValueEl = document.getElementById('div-rolled-values-recent');
+  divRecentValueEl.style.display = 'block';
+
   const currentPlayerId = currentBoardState.nextPlayerId;
   axios.post('/throwDice', { gameId, currentPlayerId })
     .then((response) => {
@@ -254,12 +316,19 @@ const throwRollingSticksDice = () => {
       setGameIdAndBoardState(response.data);
 
       const itemTotalValueEl = document.createElement('li');
-      const textValue = document.createTextNode(`Player: ${currentPlayerId} - Rolled Value: ${totalDicedValue}`);
+      const textValue = document.createTextNode(`Player: ${currentBoardState.playersEntryPoint[currentPlayerId].playerEmail.split('@', 1)} - Rolled Value: ${totalDicedValue}`);
       itemTotalValueEl.appendChild(textValue);
       const rolledValuesListEl = document.getElementById('rolled-dice');
       rolledValuesListEl.insertBefore(itemTotalValueEl, rolledValuesListEl.childNodes[0]);
 
+      const recentValueEl = document.getElementById('rolled-values-recent');
+      if (recentValueEl)
+      {
+        recentValueEl.innerText = `Player: ${currentBoardState.playersEntryPoint[currentPlayerId].playerEmail.split('@', 1)} - Rolled Value: ${totalDicedValue}`;
+      }
+
       // To do: Hightlight the target positions
+      // hightlightTraversePath(response.data.currentBoardState, currentPlayerId);
     })
     .catch((err) => {
       console.log(err);
@@ -652,6 +721,21 @@ const markSafeCells = () => {
       divSafeCellElement.classList.add('safe-cell');
     }
   });
+  const centreCell = currentBoardState.boardCornersAndSafePos.FinalPos;
+  let centrePosStr = null;
+  if (Array.isArray(centreCell))
+  {
+    centrePosStr = centreCell.join('-');
+  }
+  else {
+    centrePosStr = JSON.parse(centreCell).join('-');
+  }
+  const idValue = `r-c-${centrePosStr}`;
+  const divCentreCellElement = document.getElementById(idValue);
+  if (divCentreCellElement)
+  {
+    divCentreCellElement.classList.add('centre-cell');
+  }
 };
 
 const refreshGameStatus = () => {
@@ -679,9 +763,10 @@ const refreshGameStatus = () => {
 };
 
 const skipTurn = () => {
+  deleteHighlights();
   // Set the next player id and activate that player
   // Same as calling refresh and activating next players turn
-  axios.get('/setNextPlayer', { gameId })
+  axios.post('/setNextPlayer', { gameId })
     .then((response) => {
       console.log(response.data);
 
@@ -695,7 +780,7 @@ const skipTurn = () => {
 
 const addSkipButton = (parentNode) => {
   const skipButton = document.createElement('button');
-  skipButton.classList.add('btn', 'btn-sm');
+  skipButton.classList.add('btn', 'btn-sm', CUST_BUTTON_CLASS);
   skipButton.innerText = 'Skip Turn';
   // const btnIconEl = document.createElement('img');
   // btnIconEl.innerHTML = 'Skip Turn';
@@ -730,7 +815,7 @@ const drawBoard = (boardSize) => {
   const divOuterGameBoard = document.getElementById('div-outer-game-board');
   const divTopRow = document.createElement('div');
   divTopRow.setAttribute('id', 'top-player');
-  divTopRow.classList.add('row', 'border');
+  divTopRow.classList.add('row');
   // Add a span element idicating info to be used ondrop event
   // handle drop events
   const spanEl = document.createElement('span');
@@ -743,12 +828,12 @@ const drawBoard = (boardSize) => {
   divOuterGameBoard.appendChild(divTopRow);
 
   const divMiddleRow = document.createElement('div');
-  divMiddleRow.classList.add('row', 'border');
+  divMiddleRow.classList.add('row');
   divOuterGameBoard.appendChild(divMiddleRow);
 
   const divBottomRow = document.createElement('div');
   divBottomRow.setAttribute('id', 'bottom-player');
-  divBottomRow.classList.add('row', 'border');
+  divBottomRow.classList.add('row');
   // Add a span element idicating info to be used ondrop event
   // handle drop events
   divBottomRow.appendChild(spanEl.cloneNode(true));
@@ -793,7 +878,7 @@ const drawBoard = (boardSize) => {
       const divCol = document.createElement('div');
       divCol.innerHTML = `<sup>${rowIndex},${colIndex}</sup>`;
       divCol.setAttribute('id', `r-c-${rowIndex}-${colIndex}`);
-      divCol.classList.add('col', 'board-cell', 'border');
+      divCol.classList.add('col', 'board-cell');
       divCol.addEventListener('drop', onDrop);
       divCol.addEventListener('dragover', onDragOver);
 
@@ -894,11 +979,12 @@ const createBoard = (boardSize) => {
   const divPlayGroupButtons = document.getElementById('div-play-group-buttons');
   const btnThrowDice = document.createElement('button');
   btnThrowDice.setAttribute('id', 'btn-throw-dice');
+  btnThrowDice.classList.add('btn', 'btn-sm', CUST_BUTTON_CLASS);
   btnThrowDice.innerText = 'Roll Stick Dice';
   btnThrowDice.addEventListener('click', throwRollingSticksDice);
   divPlayGroupButtons.appendChild(btnThrowDice);
 
-  addSkipButton(divPlayGroupButtons);
+  // addSkipButton(divPlayGroupButtons);
 };
 
 /**
@@ -931,6 +1017,9 @@ const createPlayerTokenArray = () => {
  * Also, this function initiates the board drawing
  */
 const startGame = () => {
+  const divRefreshGameBtn = document.getElementById('div-refresh-game-button');
+  divRefreshGameBtn.style.display = 'block';
+
   const boardSize = document.getElementById(BOARD_SIZE_COMBO_ID).value;
   // An array of objects that holds info on players and their selected tokens
   const playerTokenArray = createPlayerTokenArray();
@@ -954,6 +1043,7 @@ const startGame = () => {
 const createStartGameButton = () => {
   const divStartGameBtn = document.getElementById('div-start-game-button');
   const startgameBtn = document.createElement('button');
+  startgameBtn.classList.add('btn', 'btn-sm', CUST_BUTTON_CLASS);
   startgameBtn.innerText = 'Start Game';
   divStartGameBtn.appendChild(startgameBtn);
   startgameBtn.addEventListener('click', startGame);
@@ -962,7 +1052,9 @@ const createStartGameButton = () => {
 const createRefreshButton = () => {
   const divRefreshGameBtn = document.getElementById('div-refresh-game-button');
   const refreshGameBtn = document.createElement('button');
-  refreshGameBtn.innerText = 'Refresh Game';
+  refreshGameBtn.classList.add('btn', 'btn-sm', CUST_BUTTON_CLASS);
+  refreshGameBtn.innerText = 'Refresh';
+  divRefreshGameBtn.style.display = 'none';
   divRefreshGameBtn.appendChild(refreshGameBtn);
   refreshGameBtn.addEventListener('click', refreshGameStatus);
 };
@@ -971,9 +1063,15 @@ const createRefreshButton = () => {
  * Handler for the clicking PlayGame Button
  */
 const playGame = () => {
+  // Hide the Game description and details
+  const gameDetailsEl = document.getElementById('game-details');
+  gameDetailsEl.style.display = 'none';
   // Hide the play game button
   const btnPlayGame = document.getElementById('btn-play-game');
   btnPlayGame.style.display = 'none';
+
+  const divSettingsEl = document.getElementById('settings');
+  divSettingsEl.style.display = 'flex';
 
   // Show the combo list for Board Size and Player count
   createBoardSelectCombo();
@@ -1021,17 +1119,19 @@ const requestSignup = () => {
 
 const doLoginAsGuest = () => {
   const loginEl = document.getElementById('login-form');
-  loginEl.hidden = true;
-  const startEl = document.getElementById('start');
-  startEl.hidden = false;
+  loginEl.style.display = 'none';
+  const startElement = document.getElementById('start');
+  startElement.style.display = 'block';
+  const btnPlayGame = document.getElementById('btn-play-game');
+  btnPlayGame.style.display = 'block';
+  const divSettingsEl = document.getElementById('settings');
+  divSettingsEl.style.display = 'none';
 };
 
 /**
  * Starting point
  */
 function main() {
-  const startEl = document.getElementById('start');
-  startEl.hidden = true;
   const btnLogin = document.getElementById('submit-login');
   btnLogin.addEventListener('click', requestLogin);
   const btnSignup = document.getElementById('submit-signup');
@@ -1039,7 +1139,12 @@ function main() {
   const btnGuest = document.getElementById('as-guest');
   btnGuest.addEventListener('click', doLoginAsGuest);
   const btnPlayGame = document.getElementById('btn-play-game');
+  btnPlayGame.style.display = 'none';
   btnPlayGame.addEventListener('click', playGame);
+  const rollValueEl = document.getElementById('div-rolled-values');
+  rollValueEl.style.display = 'none';
+  const divRecentValueEl = document.getElementById('div-rolled-values-recent');
+  divRecentValueEl.style.display = 'none';
 }
 
 getAllTokens();
