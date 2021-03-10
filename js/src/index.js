@@ -16,6 +16,7 @@ let totalDicedValue = 0; // recently played dice value
 let remainingDiceValue = totalDicedValue; // for each cell movement, this value will be dcremented
 const mapPlayerIdToOuterBoardPosClassName = {};
 let winnerId = -1;
+let isGameStarted = false;
 
 const startEl = document.getElementById('start');
 startEl.style.display = 'none';
@@ -1017,22 +1018,31 @@ const createPlayerTokenArray = () => {
  * Also, this function initiates the board drawing
  */
 const startGame = () => {
-  const divRefreshGameBtn = document.getElementById('div-refresh-game-button');
-  divRefreshGameBtn.style.display = 'block';
-
-  const boardSize = document.getElementById(BOARD_SIZE_COMBO_ID).value;
-  // An array of objects that holds info on players and their selected tokens
-  const playerTokenArray = createPlayerTokenArray();
-  console.log(`${boardSize}, ${playerTokenArray}, ${playersList}`);
-  axios.post('/createGame', { boardSize, playerTokenArray, playersList })
-    .then((response) => {
-      console.log(response.data);
-      setGameIdAndBoardState(response.data);
-      createBoard(boardSize);
-    })
-    .catch((err) => {
-      console.log(err);
-    });
+  console.log('startGame');
+  if (!isGameStarted)
+  {
+    console.log('Game is not started');
+    const divRefreshGameBtn = document.getElementById('div-refresh-game-button');
+    divRefreshGameBtn.style.display = 'block';
+    isGameStarted = true;
+    const boardSize = document.getElementById(BOARD_SIZE_COMBO_ID).value;
+    // An array of objects that holds info on players and their selected tokens
+    const playerTokenArray = createPlayerTokenArray();
+    console.log(`${boardSize}, ${playerTokenArray}, ${playersList}`);
+    axios.post('/createGame', { boardSize, playerTokenArray, playersList })
+      .then((response) => {
+        console.log(response.data);
+        setGameIdAndBoardState(response.data);
+        createBoard(boardSize);
+        isGameStarted = true;
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+  }
+  else {
+    console.log('Game is already started');
+  }
 
   // const { boardSize, playerTokenArray } = request.body;
 };
